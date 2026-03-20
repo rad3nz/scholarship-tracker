@@ -1,5 +1,5 @@
 {
-  "createdAt": "2026-03-20T13:21:45.788Z",
+  "createdAt": "2026-03-20T13:47:20.273Z",
   "data": {
     "scholarships": [
       {
@@ -10,12 +10,12 @@
         "applicationYear": 2026,
         "deadline": "2026-04-30T00:00:00.000Z",
         "status": "Preparing",
-        "note": "",
         "requiredDocumentIds": [],
         "createdBy": "user",
         "createdAt": "2026-03-20T13:10:23.012Z",
-        "updatedAt": "2026-03-20T13:10:23.012Z",
-        "id": 25
+        "updatedAt": "2026-03-20T13:40:36.795Z",
+        "id": 25,
+        "note": "Link Format: https://www.australiaawardsindonesia.org/files/lta/Referee%20Report%20for%20AAS%20Applications.docx"
       }
     ],
     "checklistItems": [
@@ -83,10 +83,10 @@
         "scholarshipId": 25,
         "text": "Laporan Referensi Akademik",
         "checked": false,
-        "note": "Inggris, Link Format: https://www.australiaawardsindonesia.org/files/lta/Referee%20Report%20for%20AAS%20Applications.docx",
+        "note": "Inggris",
         "order": 7,
         "createdAt": "2026-03-20T13:16:00.493Z",
-        "updatedAt": "2026-03-20T13:20:39.273Z",
+        "updatedAt": "2026-03-20T13:40:29.328Z",
         "id": 88
       },
       {
