@@ -12,6 +12,7 @@ const ScholarshipForm = ({ scholarship, documents = [], onSave, onCancel, onTemp
     applicationYear: new Date().getFullYear(),
     deadline: '',
     status: 'Not Started',
+    note: '',
     requiredDocumentIds: [],
   });
 
@@ -30,6 +31,7 @@ const ScholarshipForm = ({ scholarship, documents = [], onSave, onCancel, onTemp
         applicationYear: scholarship.applicationYear,
         deadline: scholarship.deadline.split('T')[0],
         status: scholarship.status,
+        note: scholarship.note || '',
         requiredDocumentIds: scholarship.requiredDocumentIds || [],
       });
       setShowTemplateSelector(false);
@@ -42,6 +44,7 @@ const ScholarshipForm = ({ scholarship, documents = [], onSave, onCancel, onTemp
         applicationYear: new Date().getFullYear(),
         deadline: '',
         status: 'Not Started',
+        note: '',
         requiredDocumentIds: [],
       });
       setShowTemplateSelector(true);
@@ -322,6 +325,21 @@ const ScholarshipForm = ({ scholarship, documents = [], onSave, onCancel, onTemp
               <option value="Result">Result</option>
             </select>
           </div>
+        </div>
+
+        <div>
+          <label htmlFor="note" className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+            Notes (Optional)
+          </label>
+          <textarea
+            id="note"
+            name="note"
+            value={formData.note}
+            onChange={handleChange}
+            rows={4}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 transition-colors resize-none"
+            placeholder="Add any notes for this scholarship"
+          />
         </div>
 
         <DocumentRequirementForm

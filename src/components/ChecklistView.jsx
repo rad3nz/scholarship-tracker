@@ -126,6 +126,12 @@ const ChecklistView = ({
             {scholarship.degreeLevel} · {scholarship.country}
           </div>
         </div>
+        {scholarship.note?.trim() && (
+          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Notes</p>
+            <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{scholarship.note}</p>
+          </div>
+        )}
       </div>
 
       <DocumentRequirements scholarship={scholarship} documents={documents} onViewDocument={onViewDocument} />
