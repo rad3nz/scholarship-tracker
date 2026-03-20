@@ -12,15 +12,15 @@ const DocumentCard = ({
 
     switch (status) {
       case 'NotReady':
-        return `${baseClass} bg-gray-100 text-gray-800`;
+        return `${baseClass} bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200`;
       case 'Draft':
-        return `${baseClass} bg-yellow-100 text-yellow-800`;
+        return `${baseClass} bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200`;
       case 'Final':
-        return `${baseClass} bg-blue-100 text-blue-800`;
+        return `${baseClass} bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200`;
       case 'Uploaded':
-        return `${baseClass} bg-green-100 text-green-800`;
+        return `${baseClass} bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200`;
       default:
-        return `${baseClass} bg-gray-100 text-gray-800`;
+        return `${baseClass} bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200`;
     }
   };
 
@@ -58,7 +58,7 @@ const DocumentCard = ({
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">{document.name}</h3>
-            <p className="text-sm text-gray-500 dark:text-gray-400 dark:text-gray-500 mt-1">{getTypeLabel(document.type)}</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{getTypeLabel(document.type)}</p>
           </div>
           <span className={getStatusBadgeClass(document.status)}>{statusLabel}</span>
         </div>
@@ -78,7 +78,7 @@ const DocumentCard = ({
                     key={s.id}
                     type="button"
                     onClick={() => onViewScholarship?.(s.id)}
-                    className="px-2 py-1 rounded-md text-xs font-medium bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-colors"
+                    className="px-2 py-1 rounded-md text-xs font-medium bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-700 transition-colors"
                     title="Open scholarship"
                   >
                     {s.name}
@@ -145,7 +145,7 @@ const DocumentCard = ({
           <div className="flex gap-2">
             <button
               onClick={() => onEdit(document)}
-              className="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-800 py-2 px-3 rounded-md hover:bg-gray-200 dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors text-sm font-medium"
+              className="flex-1 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 py-2 px-3 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors text-sm font-medium"
             >
               <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -159,7 +159,7 @@ const DocumentCard = ({
             </button>
             <button
               onClick={() => onDelete(document.id)}
-              className="flex-1 bg-red-100 text-red-800 py-2 px-3 rounded-md hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors text-sm font-medium"
+              className="flex-1 bg-red-100 dark:bg-red-900/50 text-red-800 dark:text-red-200 py-2 px-3 rounded-md hover:bg-red-200 dark:hover:bg-red-900/70 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors text-sm font-medium"
             >
               <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path

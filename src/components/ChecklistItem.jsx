@@ -61,11 +61,11 @@ const ChecklistItem = ({ item, onUpdate, onDelete, onDragStart, onDragOver, onDr
       <div className="flex items-start gap-3">
         <button
           onClick={handleToggleChecked}
-          className="mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-1 dark:focus:ring-offset-gray-800"
-          style={{
-            backgroundColor: item.checked ? '#2563eb' : 'transparent',
-            borderColor: item.checked ? '#2563eb' : '#d1d5db'
-          }}
+          className={`mt-0.5 flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-1 dark:focus:ring-offset-gray-800 ${
+            item.checked
+              ? 'bg-blue-600 dark:bg-blue-500 border-blue-600 dark:border-blue-500'
+              : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600'
+          }`}
           aria-label={item.checked ? 'Mark as incomplete' : 'Mark as complete'}
         >
           {item.checked && (

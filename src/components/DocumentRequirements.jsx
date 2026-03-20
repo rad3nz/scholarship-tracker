@@ -1,10 +1,10 @@
 import React, { useMemo } from 'react';
 
 const statusMeta = {
-  NotReady: { label: 'Not Ready', dot: 'bg-gray-400', badge: 'bg-gray-100 text-gray-800' },
-  Draft: { label: 'Draft', dot: 'bg-yellow-500', badge: 'bg-yellow-100 text-yellow-800' },
-  Final: { label: 'Final', dot: 'bg-blue-500', badge: 'bg-blue-100 text-blue-800' },
-  Uploaded: { label: 'Uploaded', dot: 'bg-green-500', badge: 'bg-green-100 text-green-800' },
+  NotReady: { label: 'Not Ready', dot: 'bg-gray-400', badge: 'bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-200' },
+  Draft: { label: 'Draft', dot: 'bg-yellow-500', badge: 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' },
+  Final: { label: 'Final', dot: 'bg-blue-500', badge: 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' },
+  Uploaded: { label: 'Uploaded', dot: 'bg-green-500', badge: 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' },
 };
 
 const completeStatuses = new Set(['Final', 'Uploaded']);
@@ -56,7 +56,7 @@ const DocumentRequirements = ({ scholarship, documents = [], onViewDocument }) =
               <span className="font-semibold text-gray-900 dark:text-white">{completedCount}</span> of{' '}
               <span className="font-semibold text-gray-900 dark:text-white">{totalCount}</span> documents complete
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400 dark:text-gray-500 mt-0.5">{percentage}%</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{percentage}%</p>
           </div>
         ) : (
           <span className="text-sm text-gray-600 dark:text-gray-300">No required documents</span>
