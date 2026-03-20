@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import ChecklistItem from './ChecklistItem';
 import DocumentRequirements from './DocumentRequirements';
 
@@ -10,13 +10,25 @@ const ChecklistView = ({
   onUpdateItem,
   onDeleteItem,
   onReorderItems,
+  onUpdateScholarshipNote,
   documents = [],
   onViewDocument,
 }) => {
   const [newItemText, setNewItemText] = useState('');
   const [isAddingItem, setIsAddingItem] = useState(false);
   const [draggedItemId, setDraggedItemId] = useState(null);
+  const [isEditingScholarshipNote, setIsEditingScholarshipNote] = useState(false);
+  const [editedScholarshipNote, setEditedScholarshipNote] = useState(scholarship?.note || '');
+  const [isSavingScholarshipNote, setIsSavingScholarshipNote] = useState(false);
+  const [scholarshipNoteError, setScholarshipNoteError] = useState('');
   const isSubmittingRef = useRef(false);
+  const skipScholarshipNoteBlurRef = useRef(false);
+
+  useEffect(() => {
+    if (!isEditingScholarshipNote) {
+      setEditedScholarshipNote(scholarship?.note || '');
+    }
+  }, [scholarship?.note, isEditingScholarshipNote]);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -92,6 +104,47 @@ const ChecklistView = ({
     setDraggedItemId(null);
   }, [draggedItemId, checklistItems, onReorderItems]);
 
+  const handleStartScholarshipNoteEdit = () => {
+    setScholarshipNoteError('');
+    setEditedScholarshipNote(scholarship?.note || '');
+    setIsEditingScholarshipNote(true);
+  };
+
+  const handleCancelScholarshipNoteEdit = () => {
+    skipScholarshipNoteBlurRef.current = true;
+    setEditedScholarshipNote(scholarship?.note || '');
+    setScholarshipNoteError('');
+    setIsEditingScholarshipNote(false);
+  };
+
+  const handleSaveScholarshipNote = async () => {
+    if (!scholarship || !onUpdateScholarshipNote || isSavingScholarshipNote) {
+      return;
+    }
+
+    const normalizedDraft = editedScholarshipNote.trim();
+    const normalizedCurrent = (scholarship.note || '').trim();
+
+    if (normalizedDraft === normalizedCurrent) {
+      setScholarshipNoteError('');
+      setIsEditingScholarshipNote(false);
+      return;
+    }
+
+    setIsSavingScholarshipNote(true);
+    setScholarshipNoteError('');
+
+    try {
+      await onUpdateScholarshipNote(scholarship.id, normalizedDraft);
+      setIsEditingScholarshipNote(false);
+    } catch (error) {
+      console.error('Error saving scholarship note:', error);
+      setScholarshipNoteError('Failed to save note. Please try again.');
+    } finally {
+      setIsSavingScholarshipNote(false);
+    }
+  };
+
   if (!scholarship) {
     return null;
   }
@@ -126,10 +179,72 @@ const ChecklistView = ({
             {scholarship.degreeLevel} · {scholarship.country}
           </div>
         </div>
-        {scholarship.note?.trim() && (
+        {(scholarship.note?.trim() || isEditingScholarshipNote) && (
           <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
-            <p className="text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">Notes</p>
-            <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{scholarship.note}</p>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Notes</p>
+              {!isEditingScholarshipNote && (
+                <button
+                  type="button"
+                  onClick={handleStartScholarshipNoteEdit}
+                  className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                >
+                  Edit
+                </button>
+              )}
+            </div>
+            {isEditingScholarshipNote ? (
+              <>
+                <textarea
+                  value={editedScholarshipNote}
+                  onChange={(e) => setEditedScholarshipNote(e.target.value)}
+                  onBlur={() => {
+                    if (skipScholarshipNoteBlurRef.current) {
+                      skipScholarshipNoteBlurRef.current = false;
+                      return;
+                    }
+                    handleSaveScholarshipNote();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && e.ctrlKey) {
+                      e.preventDefault();
+                      handleSaveScholarshipNote();
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      handleCancelScholarshipNoteEdit();
+                    }
+                  }}
+                  rows={3}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent resize-none"
+                  placeholder="Add scholarship notes..."
+                  autoFocus
+                  disabled={isSavingScholarshipNote}
+                />
+                <div className="mt-1 flex items-center justify-between">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Auto-saves on blur. Press Ctrl+Enter to save now, Esc to cancel.</p>
+                  {isSavingScholarshipNote && <p className="text-xs text-blue-600 dark:text-blue-400">Saving...</p>}
+                </div>
+                {scholarshipNoteError && (
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{scholarshipNoteError}</p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-gray-600 dark:text-gray-300 whitespace-pre-wrap">{scholarship.note}</p>
+            )}
+          </div>
+        )}
+        {!scholarship.note?.trim() && !isEditingScholarshipNote && (
+          <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={handleStartScholarshipNoteEdit}
+              className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+            >
+              + Add note
+            </button>
+            {scholarshipNoteError && (
+              <p className="mt-1 text-xs text-red-600 dark:text-red-400">{scholarshipNoteError}</p>
+            )}
           </div>
         )}
       </div>

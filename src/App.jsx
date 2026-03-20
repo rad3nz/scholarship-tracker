@@ -234,6 +234,19 @@ function App() {
     }
   }, [currentChecklistScholarship, loadAllChecklistItems]);
 
+  const handleUpdateChecklistScholarshipNote = useCallback(async (scholarshipId, note) => {
+    try {
+      await updateScholarship(scholarshipId, { note });
+      await loadScholarships();
+      setCurrentChecklistScholarship((prev) => (
+        prev && prev.id === scholarshipId ? { ...prev, note } : prev
+      ));
+    } catch (error) {
+      console.error('Error updating scholarship note from checklist view:', error);
+      throw error;
+    }
+  }, []);
+
   const handleImportComplete = useCallback(async () => {
     // Refresh all data after import
     await loadScholarships();
@@ -409,6 +422,7 @@ function App() {
               onUpdateItem={handleUpdateChecklistItem}
               onDeleteItem={handleDeleteChecklistItem}
               onReorderItems={handleReorderChecklistItems}
+              onUpdateScholarshipNote={handleUpdateChecklistScholarshipNote}
               documents={documents}
               onViewDocument={handleViewDocument}
             />
