@@ -1,24 +1,117 @@
 {
-  "createdAt": "2026-01-17T14:54:07.619Z",
+  "createdAt": "2026-03-20T13:21:45.788Z",
   "data": {
     "scholarships": [
       {
-        "name": "Placeholder",
-        "provider": "Placeholder",
+        "name": "Australia Awards",
+        "provider": "Australian Government",
         "degreeLevel": "Master",
-        "country": "Indonesia",
+        "country": "Australia",
         "applicationYear": 2026,
-        "deadline": "2099-12-31T00:00:00.000Z",
-        "status": "Not Started",
+        "deadline": "2026-04-30T00:00:00.000Z",
+        "status": "Preparing",
         "requiredDocumentIds": [],
         "createdBy": "user",
-        "createdAt": "2026-01-17T14:54:03.795Z",
-        "updatedAt": "2026-01-17T14:54:03.795Z",
-        "id": 22
+        "createdAt": "2026-03-20T13:10:23.012Z",
+        "updatedAt": "2026-03-20T13:10:23.012Z",
+        "id": 25
       }
     ],
-    "checklistItems": [],
-    "documents": [],
+    "checklistItems": [
+      {
+        "scholarshipId": 25,
+        "text": "Curriculum Vitae (CV)",
+        "checked": true,
+        "note": "Inggris, Scan Asli",
+        "order": 1,
+        "createdAt": "2026-03-20T13:13:17.741Z",
+        "updatedAt": "2026-03-20T13:21:04.029Z",
+        "id": 82
+      },
+      {
+        "scholarshipId": 25,
+        "text": "KTP",
+        "checked": true,
+        "note": "Scan Asli",
+        "order": 2,
+        "createdAt": "2026-03-20T13:14:13.197Z",
+        "updatedAt": "2026-03-20T13:21:06.486Z",
+        "id": 83
+      },
+      {
+        "scholarshipId": 25,
+        "text": "Ijazah S1",
+        "checked": false,
+        "note": "Legalisir (done)",
+        "order": 3,
+        "createdAt": "2026-03-20T13:14:48.025Z",
+        "updatedAt": "2026-03-20T13:20:00.532Z",
+        "id": 84
+      },
+      {
+        "scholarshipId": 25,
+        "text": "Transkrip S1",
+        "checked": false,
+        "note": "Legalisir (done)",
+        "order": 4,
+        "createdAt": "2026-03-20T13:14:57.261Z",
+        "updatedAt": "2026-03-20T13:19:40.001Z",
+        "id": 85
+      },
+      {
+        "scholarshipId": 25,
+        "text": "Akta Kelahiran",
+        "checked": false,
+        "note": "Scan Asli",
+        "order": 5,
+        "createdAt": "2026-03-20T13:15:05.799Z",
+        "updatedAt": "2026-03-20T13:21:11.232Z",
+        "id": 86
+      },
+      {
+        "scholarshipId": 25,
+        "text": "Hasil IELTS",
+        "checked": true,
+        "note": "Scan Asli",
+        "order": 6,
+        "createdAt": "2026-03-20T13:15:17.223Z",
+        "updatedAt": "2026-03-20T13:21:12.980Z",
+        "id": 87
+      },
+      {
+        "scholarshipId": 25,
+        "text": "Laporan Referensi Akademik",
+        "checked": false,
+        "note": "Inggris, Link Format: https://www.australiaawardsindonesia.org/files/lta/Referee%20Report%20for%20AAS%20Applications.docx",
+        "order": 7,
+        "createdAt": "2026-03-20T13:16:00.493Z",
+        "updatedAt": "2026-03-20T13:20:39.273Z",
+        "id": 88
+      },
+      {
+        "scholarshipId": 25,
+        "text": "Laporan Referensi Profesional",
+        "checked": false,
+        "note": "Request ke Pak Jafar, Inggris, Link Format: https://www.australiaawardsindonesia.org/files/lta/Referee%20Report%20for%20AAS%20Applications.docx",
+        "order": 8,
+        "createdAt": "2026-03-20T13:17:10.134Z",
+        "updatedAt": "2026-03-20T13:20:45.066Z",
+        "id": 89
+      }
+    ],
+    "documents": [
+      {
+        "name": "Curriculum Vitae",
+        "type": "CV",
+        "status": "Draft",
+        "fileLink": "/mnt/HQ/Sekul/Master/master-source/[CV_English] Muhammad Fahmi Ihsan.pdf",
+        "notes": "",
+        "lastUpdated": "2026-03-20T13:04:08.933Z",
+        "createdAt": "2026-03-20T13:02:30.983Z",
+        "updatedAt": "2026-03-20T13:04:08.939Z",
+        "id": 1
+      }
+    ],
     "templates": []
   }
 }
