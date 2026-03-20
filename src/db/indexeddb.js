@@ -1,5 +1,5 @@
 const DB_NAME = 'ScholarshipTrackerDB';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 const STORE_NAME = 'scholarships';
 const CHECKLIST_STORE_NAME = 'checklistItems';
 const DOCUMENTS_STORE_NAME = 'documents';
@@ -20,6 +20,7 @@ const normalizeScholarship = (scholarship) => {
   if (!scholarship) return scholarship;
   return {
     ...scholarship,
+    note: typeof scholarship.note === 'string' ? scholarship.note : '',
     requiredDocumentIds: normalizeRequiredDocumentIds(scholarship.requiredDocumentIds),
   };
 };
@@ -46,6 +47,8 @@ export const initDB = () => {
 
     request.onupgradeneeded = (event) => {
       db = event.target.result;
+      const transaction = event.target.transaction;
+      const oldVersion = event.oldVersion;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const objectStore = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
         objectStore.createIndex('deadline', 'deadline', { unique: false });
@@ -74,6 +77,27 @@ export const initDB = () => {
         const metadataStore = db.createObjectStore(METADATA_STORE_NAME, { keyPath: 'key' });
         console.log('Object store created:', METADATA_STORE_NAME);
       }
+
+      if (oldVersion < 6 && transaction && db.objectStoreNames.contains(STORE_NAME)) {
+        const scholarshipStore = transaction.objectStore(STORE_NAME);
+        const cursorRequest = scholarshipStore.openCursor();
+
+        cursorRequest.onsuccess = (cursorEvent) => {
+          const cursor = cursorEvent.target.result;
+          if (!cursor) {
+            return;
+          }
+
+          const value = cursor.value;
+          const normalized = normalizeScholarship(value);
+
+          if (value.note !== normalized.note || value.requiredDocumentIds !== normalized.requiredDocumentIds) {
+            cursor.update(normalized);
+          }
+
+          cursor.continue();
+        };
+      }
     };
   });
 };
@@ -87,6 +111,7 @@ export const createScholarship = (data) => {
       
       const scholarship = {
         ...data,
+        note: typeof data?.note === 'string' ? data.note : '',
         requiredDocumentIds: normalizeRequiredDocumentIds(data?.requiredDocumentIds),
         createdBy: data?.createdBy || 'user', // Default to 'user' if not specified, 'system' for seed data
         createdAt: new Date().toISOString(),
@@ -176,6 +201,10 @@ export const updateScholarship = (id, data) => {
         const updated = {
           ...existing,
           ...data,
+          note:
+            data?.note !== undefined
+              ? (typeof data.note === 'string' ? data.note : '')
+              : (typeof existing.note === 'string' ? existing.note : ''),
           requiredDocumentIds: normalizeRequiredDocumentIds(
             data?.requiredDocumentIds ?? existing.requiredDocumentIds
           ),

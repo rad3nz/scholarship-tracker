@@ -17,6 +17,7 @@ export const getSeedData = () => {
           applicationYear: 2025,
           deadline: "2025-03-15T00:00:00Z",
           status: "Not Started",
+          note: "",
           requiredDocumentIds: [1, 2],
           createdAt: "2025-01-01T00:00:00Z",
           updatedAt: "2025-01-01T00:00:00Z"
@@ -30,6 +31,7 @@ export const getSeedData = () => {
           applicationYear: 2025,
           deadline: "2025-04-30T00:00:00Z",
           status: "Preparing",
+          note: "",
           requiredDocumentIds: [3],
           createdAt: "2025-01-02T00:00:00Z",
           updatedAt: "2025-01-10T00:00:00Z"

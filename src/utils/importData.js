@@ -210,6 +210,9 @@ export const importData = async (jsonData, strategy = IMPORT_STRATEGIES.REPLACE_
         if (scholarshipData.requiredDocumentIds && !Array.isArray(scholarshipData.requiredDocumentIds)) {
           scholarshipData.requiredDocumentIds = [];
         }
+
+        // Normalize optional note field
+        scholarshipData.note = typeof scholarshipData.note === 'string' ? scholarshipData.note : '';
         
         await createScholarship(scholarshipData);
         results.scholarships.created++;
