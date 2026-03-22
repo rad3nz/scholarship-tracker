@@ -10,7 +10,7 @@ const CustomTemplateForm = ({ template, onSave, onCancel }) => {
     items: []
   });
 
-  const [currentItem, setCurrentItem] = useState({ text: '', note: '' });
+  const [currentItem, setCurrentItem] = useState({ text: '', note: '', status: 'required', copies_required: 1 });
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
@@ -40,10 +40,10 @@ const CustomTemplateForm = ({ template, onSave, onCancel }) => {
   };
 
   const handleItemChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setCurrentItem(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
   };
 
@@ -54,9 +54,15 @@ const CustomTemplateForm = ({ template, onSave, onCancel }) => {
 
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { ...currentItem }]
+      items: [...prev.items, {
+        text: currentItem.text,
+        note: currentItem.note,
+        required: currentItem.status !== 'conditional',
+        conditional: currentItem.status === 'conditional',
+        copies_required: Math.max(1, Number(currentItem.copies_required) || 1),
+      }]
     }));
-    setCurrentItem({ text: '', note: '' });
+    setCurrentItem({ text: '', note: '', status: 'required', copies_required: 1 });
   };
 
   const handleRemoveItem = (index) => {
@@ -227,6 +233,35 @@ const CustomTemplateForm = ({ template, onSave, onCancel }) => {
                     placeholder="Optional note (e.g., Valid for at least 6 months)"
                   />
                 </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                      Status
+                    </label>
+                    <select
+                      name="status"
+                      value={currentItem.status}
+                      onChange={handleItemChange}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
+                    >
+                      <option value="required">Required</option>
+                      <option value="conditional">Conditional</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                      Copies Required
+                    </label>
+                    <input
+                      type="number"
+                      name="copies_required"
+                      min="1"
+                      value={currentItem.copies_required}
+                      onChange={handleItemChange}
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 transition-colors"
+                    />
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={handleAddItem}
@@ -289,6 +324,18 @@ const CustomTemplateForm = ({ template, onSave, onCancel }) => {
                             {item.note}
                           </p>
                         )}
+                        <div className="mt-2 flex items-center gap-2 flex-wrap">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            item.conditional
+                              ? 'bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200'
+                              : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+                          }`}>
+                            {item.conditional ? 'Conditional' : 'Required'}
+                          </span>
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                            Copies: {item.copies_required || 1}
+                          </span>
+                        </div>
                       </div>
                       <button
                         type="button"

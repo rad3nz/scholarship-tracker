@@ -502,29 +502,71 @@ export const BUILT_IN_TEMPLATES = [
   }
 ];
 
+const normalizeTemplateItem = (item) => {
+  const conditional = Boolean(item?.conditional);
+  let required;
+
+  if (item?.required === undefined) {
+    required = !conditional;
+  } else {
+    required = Boolean(item.required);
+  }
+
+  if (conditional) {
+    required = false;
+  }
+
+  if (!required && !conditional) {
+    required = true;
+  }
+
+  const parsedCopies = Number(item?.copies_required);
+  const copies_required = Number.isFinite(parsedCopies) && parsedCopies >= 1
+    ? Math.floor(parsedCopies)
+    : 1;
+
+  return {
+    ...item,
+    note: typeof item?.note === 'string' ? item.note : '',
+    required,
+    conditional,
+    copies_required,
+  };
+};
+
+const normalizeTemplate = (template) => ({
+  ...template,
+  items: (template.items || []).map(normalizeTemplateItem),
+});
+
 export const getBuiltInTemplates = () => {
-  return BUILT_IN_TEMPLATES;
+  return BUILT_IN_TEMPLATES.map(normalizeTemplate);
 };
 
 export const getTemplateById = (id) => {
-  return BUILT_IN_TEMPLATES.find(template => template.id === id);
+  const template = BUILT_IN_TEMPLATES.find((entry) => entry.id === id);
+  return template ? normalizeTemplate(template) : null;
 };
 
 export const getTemplatesByCategory = (category) => {
-  return BUILT_IN_TEMPLATES.filter(template => template.category === category);
+  return BUILT_IN_TEMPLATES
+    .filter((template) => template.category === category)
+    .map(normalizeTemplate);
 };
 
 export const getTemplatesByCountry = (country) => {
-  return BUILT_IN_TEMPLATES.filter(template => 
-    template.country.toLowerCase() === country.toLowerCase()
-  );
+  return BUILT_IN_TEMPLATES
+    .filter((template) => template.country.toLowerCase() === country.toLowerCase())
+    .map(normalizeTemplate);
 };
 
 export const searchTemplates = (searchTerm) => {
   const term = searchTerm.toLowerCase();
-  return BUILT_IN_TEMPLATES.filter(template => 
-    template.name.toLowerCase().includes(term) ||
-    template.description.toLowerCase().includes(term) ||
-    template.country.toLowerCase().includes(term)
-  );
+  return BUILT_IN_TEMPLATES
+    .filter((template) =>
+      template.name.toLowerCase().includes(term) ||
+      template.description.toLowerCase().includes(term) ||
+      template.country.toLowerCase().includes(term)
+    )
+    .map(normalizeTemplate);
 };

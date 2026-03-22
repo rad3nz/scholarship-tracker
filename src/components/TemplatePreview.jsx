@@ -66,6 +66,18 @@ const TemplatePreview = ({ template }) => {
                       {item.note}
                     </p>
                   )}
+                  <div className="mt-2 flex items-center gap-2 flex-wrap">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                      item.conditional
+                        ? 'bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200'
+                        : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+                    }`}>
+                      {item.conditional ? 'Conditional' : 'Required'}
+                    </span>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                      Copies: {item.copies_required || 1}
+                    </span>
+                  </div>
                 </div>
               </div>
             </li>
