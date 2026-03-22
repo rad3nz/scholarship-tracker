@@ -1,7 +1,9 @@
-import { BUILT_IN_TEMPLATES } from './templates.js';
+import { getBuiltInTemplates } from './templates.js';
 
 // Export a function to get seed data with templates included
 export const getSeedData = () => {
+  const builtInTemplates = getBuiltInTemplates();
+
   return {
     version: '1.0',
     exportedAt: new Date().toISOString(),
@@ -104,7 +106,7 @@ export const getSeedData = () => {
           updatedAt: "2025-01-06T00:00:00Z"
         }
       ],
-      templates: BUILT_IN_TEMPLATES.map(template => ({
+      templates: builtInTemplates.map(template => ({
         id: template.id,
         name: template.name,
         description: template.description,
