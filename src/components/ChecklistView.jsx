@@ -7,6 +7,7 @@ const ChecklistView = ({
   onBack,
   checklistItems,
   onCreateItem,
+  onCreateItemsBulk,
   onUpdateItem,
   onDeleteItem,
   onReorderItems,
@@ -15,7 +16,13 @@ const ChecklistView = ({
   onViewDocument,
 }) => {
   const [newItemText, setNewItemText] = useState('');
+  const [newItemStatus, setNewItemStatus] = useState('required');
+  const [newItemCopiesRequired, setNewItemCopiesRequired] = useState(1);
   const [isAddingItem, setIsAddingItem] = useState(false);
+  const [isAddingBulkItems, setIsAddingBulkItems] = useState(false);
+  const [bulkInputText, setBulkInputText] = useState('');
+  const [bulkStatus, setBulkStatus] = useState('required');
+  const [bulkCopiesRequired, setBulkCopiesRequired] = useState(1);
   const [draggedItemId, setDraggedItemId] = useState(null);
   const [isEditingScholarshipNote, setIsEditingScholarshipNote] = useState(false);
   const [editedScholarshipNote, setEditedScholarshipNote] = useState(scholarship?.note || '');
@@ -44,17 +51,82 @@ const ChecklistView = ({
       isSubmittingRef.current = true;
       try {
         const maxOrder = Math.max(-1, ...checklistItems.map(item => item.order));
+        const required = newItemStatus !== 'conditional';
         await onCreateItem({
           text: newItemText.trim(),
           checked: false,
           note: '',
-          order: maxOrder + 1
+          order: maxOrder + 1,
+          required,
+          conditional: !required,
+          copies_required: Math.max(1, Number(newItemCopiesRequired) || 1),
         });
         setNewItemText('');
+        setNewItemStatus('required');
+        setNewItemCopiesRequired(1);
         setIsAddingItem(false);
       } finally {
         isSubmittingRef.current = false;
       }
+    }
+  };
+
+  const parseBulkInputItems = () => {
+    const uniqueByText = new Set();
+    return bulkInputText
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0)
+      .filter((line) => {
+        const key = line.toLowerCase();
+        if (uniqueByText.has(key)) {
+          return false;
+        }
+        uniqueByText.add(key);
+        return true;
+      });
+  };
+
+  const handleAddBulkItems = async () => {
+    if (isSubmittingRef.current) {
+      return;
+    }
+
+    const parsedItems = parseBulkInputItems();
+    if (parsedItems.length === 0) {
+      return;
+    }
+
+    isSubmittingRef.current = true;
+    try {
+      const required = bulkStatus !== 'conditional';
+      const normalizedCopies = Math.max(1, Number(bulkCopiesRequired) || 1);
+      const maxOrder = Math.max(-1, ...checklistItems.map(item => item.order));
+
+      const payload = parsedItems.map((text, index) => ({
+        text,
+        checked: false,
+        note: '',
+        order: maxOrder + index + 1,
+        required,
+        conditional: !required,
+        copies_required: normalizedCopies,
+      }));
+
+      if (onCreateItemsBulk) {
+        await onCreateItemsBulk(payload);
+      } else {
+        for (const item of payload) {
+          await onCreateItem(item);
+        }
+      }
+
+      setBulkInputText('');
+      setBulkStatus('required');
+      setBulkCopiesRequired(1);
+      setIsAddingBulkItems(false);
+    } finally {
+      isSubmittingRef.current = false;
     }
   };
 
@@ -64,6 +136,8 @@ const ChecklistView = ({
       handleAddItem();
     } else if (e.key === 'Escape') {
       setNewItemText('');
+      setNewItemStatus('required');
+      setNewItemCopiesRequired(1);
       setIsAddingItem(false);
     }
   };
@@ -285,6 +359,33 @@ const ChecklistView = ({
               className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent"
               autoFocus
             />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                  Item Status
+                </label>
+                <select
+                  value={newItemStatus}
+                  onChange={(e) => setNewItemStatus(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                >
+                  <option value="required">Required</option>
+                  <option value="conditional">Conditional</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                  Copies Required
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={newItemCopiesRequired}
+                  onChange={(e) => setNewItemCopiesRequired(e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+                />
+              </div>
+            </div>
             <div className="flex gap-2 mt-3">
               <button
                 onClick={handleAddItem}
@@ -296,6 +397,8 @@ const ChecklistView = ({
                 onClick={() => {
                   setIsAddingItem(false);
                   setNewItemText('');
+                  setNewItemStatus('required');
+                  setNewItemCopiesRequired(1);
                 }}
                 className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 dark:focus:ring-offset-gray-800"
               >
@@ -304,14 +407,94 @@ const ChecklistView = ({
             </div>
           </div>
         ) : (
-          <button
-            onClick={() => setIsAddingItem(true)}
-            className="w-full px-4 py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:border-blue-500 dark:hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-1 dark:focus:ring-offset-gray-800"
-          >
-            + Add New Requirement
-          </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              onClick={() => {
+                setIsAddingItem(true);
+                setIsAddingBulkItems(false);
+              }}
+              className="w-full px-4 py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:border-blue-500 dark:hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-1 dark:focus:ring-offset-gray-800"
+            >
+              + Add New Requirement
+            </button>
+            <button
+              onClick={() => {
+                setIsAddingBulkItems(true);
+                setIsAddingItem(false);
+              }}
+              className="w-full px-4 py-3 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 dark:text-gray-400 hover:border-blue-500 dark:hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-1 dark:focus:ring-offset-gray-800"
+            >
+              + Bulk Add Requirements
+            </button>
+          </div>
         )}
       </div>
+
+      {isAddingBulkItems && (
+        <div className="mb-4 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 shadow-sm">
+          <textarea
+            rows={6}
+            value={bulkInputText}
+            onChange={(e) => setBulkInputText(e.target.value)}
+            placeholder="Paste one requirement per line"
+            className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent resize-none"
+          />
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            Empty lines and duplicate lines in this paste are skipped.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                Apply Status
+              </label>
+              <select
+                value={bulkStatus}
+                onChange={(e) => setBulkStatus(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              >
+                <option value="required">Required</option>
+                <option value="conditional">Conditional</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">
+                Copies Required
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={bulkCopiesRequired}
+                onChange={(e) => setBulkCopiesRequired(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400"
+              />
+            </div>
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={handleAddBulkItems}
+              disabled={!bulkInputText.trim()}
+              className={`px-4 py-2 text-sm font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:ring-offset-1 dark:focus:ring-offset-gray-800 ${
+                bulkInputText.trim()
+                  ? 'bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600'
+                  : 'bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed'
+              }`}
+            >
+              Add {parseBulkInputItems().length || ''} Items
+            </button>
+            <button
+              onClick={() => {
+                setBulkInputText('');
+                setBulkStatus('required');
+                setBulkCopiesRequired(1);
+                setIsAddingBulkItems(false);
+              }}
+              className="px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-1 dark:focus:ring-offset-gray-800"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         {checklistItems.length === 0 ? (

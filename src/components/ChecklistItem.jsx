@@ -1,10 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const ChecklistItem = ({ item, onUpdate, onDelete, onDragStart, onDragOver, onDrop, isDragging }) => {
   const [isEditingText, setIsEditingText] = useState(false);
   const [isEditingNote, setIsEditingNote] = useState(false);
+  const [isEditingMeta, setIsEditingMeta] = useState(false);
   const [editedText, setEditedText] = useState(item.text);
   const [editedNote, setEditedNote] = useState(item.note);
+  const [editedStatus, setEditedStatus] = useState(item.conditional ? 'conditional' : 'required');
+  const [editedCopiesRequired, setEditedCopiesRequired] = useState(item.copies_required || 1);
+
+  useEffect(() => {
+    setEditedText(item.text);
+    setEditedNote(item.note || '');
+    setEditedStatus(item.conditional ? 'conditional' : 'required');
+    setEditedCopiesRequired(item.copies_required || 1);
+  }, [item]);
 
   const handleToggleChecked = async () => {
     await onUpdate(item.id, { checked: !item.checked });
@@ -32,6 +42,22 @@ const ChecklistItem = ({ item, onUpdate, onDelete, onDragStart, onDragOver, onDr
     setIsEditingNote(false);
   };
 
+  const handleSaveMeta = async () => {
+    const required = editedStatus !== 'conditional';
+    await onUpdate(item.id, {
+      required,
+      conditional: !required,
+      copies_required: Math.max(1, Number(editedCopiesRequired) || 1),
+    });
+    setIsEditingMeta(false);
+  };
+
+  const handleCancelMeta = () => {
+    setEditedStatus(item.conditional ? 'conditional' : 'required');
+    setEditedCopiesRequired(item.copies_required || 1);
+    setIsEditingMeta(false);
+  };
+
   const handleDelete = () => {
     if (window.confirm('Are you sure you want to delete this item?')) {
       onDelete(item.id);
@@ -45,10 +71,18 @@ const ChecklistItem = ({ item, onUpdate, onDelete, onDragStart, onDragOver, onDr
     } else if (e.key === 'Escape') {
       setIsEditingText(false);
       setIsEditingNote(false);
+      setIsEditingMeta(false);
       setEditedText(item.text);
       setEditedNote(item.note);
+      setEditedStatus(item.conditional ? 'conditional' : 'required');
+      setEditedCopiesRequired(item.copies_required || 1);
     }
   };
+
+  const statusLabel = item.conditional ? 'Conditional' : 'Required';
+  const statusBadgeClass = item.conditional
+    ? 'bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200'
+    : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200';
 
   return (
     <div
@@ -104,6 +138,61 @@ const ChecklistItem = ({ item, onUpdate, onDelete, onDragStart, onDragOver, onDr
             >
               {item.text}
             </p>
+          )}
+
+          {isEditingMeta ? (
+            <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Status</label>
+                <select
+                  value={editedStatus}
+                  onChange={(e) => setEditedStatus(e.target.value)}
+                  className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                >
+                  <option value="required">Required</option>
+                  <option value="conditional">Conditional</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Copies Required</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={editedCopiesRequired}
+                  onChange={(e) => setEditedCopiesRequired(e.target.value)}
+                  className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              <div className="sm:col-span-2 flex gap-2">
+                <button
+                  onClick={handleSaveMeta}
+                  className="px-3 py-1.5 text-xs font-medium rounded bg-blue-600 dark:bg-blue-500 text-white hover:bg-blue-700 dark:hover:bg-blue-600"
+                >
+                  Save Details
+                </button>
+                <button
+                  onClick={handleCancelMeta}
+                  className="px-3 py-1.5 text-xs font-medium rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
+              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${statusBadgeClass}`}>
+                {statusLabel}
+              </span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200">
+                Copies: {item.copies_required || 1}
+              </span>
+              <button
+                onClick={() => setIsEditingMeta(true)}
+                className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+              >
+                Edit details
+              </button>
+            </div>
           )}
 
           {item.note || isEditingNote ? (
