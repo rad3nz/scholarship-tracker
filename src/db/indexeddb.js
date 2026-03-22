@@ -1,5 +1,5 @@
 const DB_NAME = 'ScholarshipTrackerDB';
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 const STORE_NAME = 'scholarships';
 const CHECKLIST_STORE_NAME = 'checklistItems';
 const DOCUMENTS_STORE_NAME = 'documents';
@@ -22,6 +22,70 @@ const normalizeScholarship = (scholarship) => {
     ...scholarship,
     note: typeof scholarship.note === 'string' ? scholarship.note : '',
     requiredDocumentIds: normalizeRequiredDocumentIds(scholarship.requiredDocumentIds),
+  };
+};
+
+const normalizeChecklistItem = (item) => {
+  if (!item) return item;
+
+  const hasStatus = typeof item.status === 'string';
+  const status = hasStatus ? item.status.toLowerCase() : '';
+  const statusConditional = status === 'conditional';
+  const statusRequired = status === 'required';
+
+  const conditional = statusConditional ? true : Boolean(item.conditional);
+  let required;
+
+  if (statusRequired) {
+    required = true;
+  } else if (statusConditional) {
+    required = false;
+  } else if (item.required === undefined) {
+    required = !conditional;
+  } else {
+    required = Boolean(item.required);
+  }
+
+  if (conditional) {
+    required = false;
+  }
+
+  if (!required && !conditional) {
+    required = true;
+  }
+
+  const parsedCopies = Number(item.copies_required);
+  const copies_required = Number.isFinite(parsedCopies) && parsedCopies >= 1
+    ? Math.floor(parsedCopies)
+    : 1;
+
+  return {
+    ...item,
+    note: typeof item.note === 'string' ? item.note : '',
+    required,
+    conditional,
+    copies_required,
+  };
+};
+
+const normalizeTemplateItem = (item) => {
+  if (!item || typeof item !== 'object') {
+    return {
+      text: '',
+      note: '',
+      required: true,
+      conditional: false,
+      copies_required: 1,
+    };
+  }
+
+  const normalized = normalizeChecklistItem(item);
+  return {
+    ...item,
+    note: normalized.note,
+    required: normalized.required,
+    conditional: normalized.conditional,
+    copies_required: normalized.copies_required,
   };
 };
 
@@ -92,6 +156,32 @@ export const initDB = () => {
           const normalized = normalizeScholarship(value);
 
           if (value.note !== normalized.note || value.requiredDocumentIds !== normalized.requiredDocumentIds) {
+            cursor.update(normalized);
+          }
+
+          cursor.continue();
+        };
+      }
+
+      if (oldVersion < 7 && transaction && db.objectStoreNames.contains(CHECKLIST_STORE_NAME)) {
+        const checklistStore = transaction.objectStore(CHECKLIST_STORE_NAME);
+        const cursorRequest = checklistStore.openCursor();
+
+        cursorRequest.onsuccess = (cursorEvent) => {
+          const cursor = cursorEvent.target.result;
+          if (!cursor) {
+            return;
+          }
+
+          const value = cursor.value;
+          const normalized = normalizeChecklistItem(value);
+
+          if (
+            value.required !== normalized.required ||
+            value.conditional !== normalized.conditional ||
+            value.copies_required !== normalized.copies_required ||
+            value.note !== normalized.note
+          ) {
             cursor.update(normalized);
           }
 
@@ -326,15 +416,18 @@ export const createChecklistItem = (scholarshipId, data) => {
       const transaction = db.transaction([CHECKLIST_STORE_NAME], 'readwrite');
       const objectStore = transaction.objectStore(CHECKLIST_STORE_NAME);
 
-      const checklistItem = {
+      const checklistItem = normalizeChecklistItem({
         scholarshipId,
         text: data.text,
         checked: data.checked || false,
         note: data.note || '',
         order: data.order || 0,
+        required: data.required,
+        conditional: data.conditional,
+        copies_required: data.copies_required,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
-      };
+      });
 
       const request = objectStore.add(checklistItem);
 
@@ -363,7 +456,9 @@ export const getChecklistItems = (scholarshipId) => {
       const request = index.getAll(scholarshipId);
 
       request.onsuccess = () => {
-        const items = request.result.sort((a, b) => a.order - b.order);
+        const items = request.result
+          .map(normalizeChecklistItem)
+          .sort((a, b) => a.order - b.order);
         console.log('Retrieved checklist items:', items.length, 'for scholarship:', scholarshipId);
         resolve(items);
       };
@@ -394,11 +489,11 @@ export const updateChecklistItem = (id, data) => {
           return;
         }
 
-        const updated = {
+        const updated = normalizeChecklistItem({
           ...existing,
           ...data,
           updatedAt: new Date().toISOString()
-        };
+        });
 
         const updateRequest = objectStore.put(updated);
 
@@ -467,11 +562,11 @@ export const reorderChecklistItems = (scholarshipId, items) => {
             return;
           }
 
-          const updated = {
+          const updated = normalizeChecklistItem({
             ...existing,
             order: index,
             updatedAt: new Date().toISOString()
-          };
+          });
 
           const putRequest = objectStore.put(updated);
 
@@ -495,6 +590,94 @@ export const reorderChecklistItems = (scholarshipId, items) => {
           reject(getRequest.error);
         };
       });
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
+export const createChecklistItemsBulk = (scholarshipId, itemsData) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      await initDB();
+
+      if (!Array.isArray(itemsData) || itemsData.length === 0) {
+        resolve([]);
+        return;
+      }
+
+      const normalizedItems = itemsData
+        .filter((item) => item && typeof item.text === 'string' && item.text.trim())
+        .map((item) => ({
+          text: item.text.trim(),
+          checked: Boolean(item.checked),
+          note: typeof item.note === 'string' ? item.note : '',
+          required: item.required,
+          conditional: item.conditional,
+          copies_required: item.copies_required,
+        }));
+
+      if (normalizedItems.length === 0) {
+        resolve([]);
+        return;
+      }
+
+      const transaction = db.transaction([CHECKLIST_STORE_NAME], 'readwrite');
+      const objectStore = transaction.objectStore(CHECKLIST_STORE_NAME);
+      const index = objectStore.index('scholarshipId');
+
+      let finalized = false;
+      const createdItems = [];
+
+      const fail = (error) => {
+        if (finalized) return;
+        finalized = true;
+        reject(error);
+      };
+
+      transaction.onerror = () => {
+        fail(transaction.error || new Error('Bulk checklist transaction failed'));
+      };
+
+      const getExistingRequest = index.getAll(scholarshipId);
+
+      getExistingRequest.onsuccess = () => {
+        const existingItems = getExistingRequest.result || [];
+        const maxOrder = existingItems.reduce((acc, item) => Math.max(acc, Number(item.order) || 0), -1);
+
+        normalizedItems.forEach((item, indexInBatch) => {
+          const checklistItem = normalizeChecklistItem({
+            scholarshipId,
+            text: item.text,
+            checked: item.checked,
+            note: item.note,
+            required: item.required,
+            conditional: item.conditional,
+            copies_required: item.copies_required,
+            order: maxOrder + indexInBatch + 1,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+
+          const addRequest = objectStore.add(checklistItem);
+
+          addRequest.onsuccess = () => {
+            createdItems.push({ ...checklistItem, id: addRequest.result });
+            if (createdItems.length === normalizedItems.length && !finalized) {
+              finalized = true;
+              resolve(createdItems.sort((a, b) => a.order - b.order));
+            }
+          };
+
+          addRequest.onerror = () => {
+            fail(addRequest.error || new Error('Failed to create checklist item in bulk'));
+          };
+        });
+      };
+
+      getExistingRequest.onerror = () => {
+        fail(getExistingRequest.error || new Error('Failed to load existing checklist items'));
+      };
     } catch (error) {
       reject(error);
     }
@@ -736,7 +919,7 @@ export const createTemplate = (data) => {
         description: data.description || '',
         category: data.category || 'Custom',
         country: data.country || '',
-        items: data.items || [],
+        items: (data.items || []).map(normalizeTemplateItem),
         createdBy: 'user',
         version: '1.0',
         createdAt: new Date().toISOString(),
@@ -770,7 +953,14 @@ export const getTemplate = (id) => {
 
       request.onsuccess = () => {
         console.log('Retrieved template:', id);
-        resolve(request.result);
+        if (!request.result) {
+          resolve(request.result);
+          return;
+        }
+        resolve({
+          ...request.result,
+          items: (request.result.items || []).map(normalizeTemplateItem),
+        });
       };
 
       request.onerror = () => {
@@ -792,7 +982,10 @@ export const getAllTemplates = () => {
       const request = objectStore.getAll();
 
       request.onsuccess = () => {
-        const templates = request.result;
+        const templates = request.result.map((template) => ({
+          ...template,
+          items: (template.items || []).map(normalizeTemplateItem),
+        }));
         console.log('Retrieved templates:', templates.length);
         resolve(templates);
       };
@@ -831,6 +1024,7 @@ export const updateTemplate = (id, data) => {
         const updated = {
           ...existing,
           ...data,
+          items: (data.items || existing.items || []).map(normalizeTemplateItem),
           updatedAt: new Date().toISOString()
         };
 
@@ -911,7 +1105,10 @@ export const getUserTemplates = () => {
       const request = index.getAll('user');
 
       request.onsuccess = () => {
-        const templates = request.result;
+        const templates = request.result.map((template) => ({
+          ...template,
+          items: (template.items || []).map(normalizeTemplateItem),
+        }));
         console.log('Retrieved user templates:', templates.length);
         resolve(templates);
       };

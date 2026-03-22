@@ -12,6 +12,32 @@ export const IMPORT_STRATEGIES = {
   MERGE: 'merge'
 };
 
+const normalizeChecklistFlags = (item) => {
+  const conditional = Boolean(item?.conditional);
+  let required;
+
+  if (item?.required === undefined) {
+    required = !conditional;
+  } else {
+    required = Boolean(item.required);
+  }
+
+  if (conditional) {
+    required = false;
+  }
+
+  if (!required && !conditional) {
+    required = true;
+  }
+
+  const parsedCopies = Number(item?.copies_required);
+  const copies_required = Number.isFinite(parsedCopies) && parsedCopies >= 1
+    ? Math.floor(parsedCopies)
+    : 1;
+
+  return { required, conditional, copies_required };
+};
+
 // Validate the structure and content of imported data
 export const validateImportData = (jsonData) => {
   const errors = [];
@@ -93,6 +119,18 @@ export const validateImportData = (jsonData) => {
       if (typeof item.order !== 'number') {
         warnings.push(`Checklist item "${item.text || 'Unknown'}" has invalid order type, defaulting to 0`);
       }
+
+      if (item.required !== undefined && typeof item.required !== 'boolean') {
+        warnings.push(`Checklist item "${item.text || 'Unknown'}" has invalid required flag, normalizing`);
+      }
+
+      if (item.conditional !== undefined && typeof item.conditional !== 'boolean') {
+        warnings.push(`Checklist item "${item.text || 'Unknown'}" has invalid conditional flag, normalizing`);
+      }
+
+      if (item.copies_required !== undefined && (!Number.isFinite(Number(item.copies_required)) || Number(item.copies_required) < 1)) {
+        warnings.push(`Checklist item "${item.text || 'Unknown'}" has invalid copies_required, defaulting to 1`);
+      }
     });
   }
   
@@ -152,6 +190,9 @@ export const validateImportData = (jsonData) => {
         template.items.forEach((item, itemIndex) => {
           if (!item.text) {
             warnings.push(`Template "${template.name || 'Unknown'}" has item at index ${itemIndex} missing text field`);
+          }
+          if (item.copies_required !== undefined && (!Number.isFinite(Number(item.copies_required)) || Number(item.copies_required) < 1)) {
+            warnings.push(`Template "${template.name || 'Unknown'}" has item at index ${itemIndex} with invalid copies_required, defaulting to 1`);
           }
         });
       }
@@ -259,6 +300,15 @@ export const importData = async (jsonData, strategy = IMPORT_STRATEGIES.REPLACE_
         if (templateData.items && !Array.isArray(templateData.items)) {
           templateData.items = [];
         }
+
+        templateData.items = (templateData.items || []).map((templateItem) => {
+          const flags = normalizeChecklistFlags(templateItem);
+          return {
+            text: templateItem.text,
+            note: typeof templateItem.note === 'string' ? templateItem.note : '',
+            ...flags,
+          };
+        });
         
         await createTemplate(templateData);
         results.templates.created++;
@@ -283,6 +333,10 @@ export const importData = async (jsonData, strategy = IMPORT_STRATEGIES.REPLACE_
         // Normalize data types
         itemData.checked = Boolean(itemData.checked);
         itemData.order = Number(itemData.order) || 0;
+        const flags = normalizeChecklistFlags(itemData);
+        itemData.required = flags.required;
+        itemData.conditional = flags.conditional;
+        itemData.copies_required = flags.copies_required;
         if (!itemData.text) {
           throw new Error('Missing text field');
         }
