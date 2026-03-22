@@ -35,6 +35,7 @@ import {
 } from '../db/indexeddb';
 
 const SEED_CREATEDAT_KEY = 'seedDataCreatedAt';
+let seedDatabaseInFlight = null;
 
 /**
  * Get the currently installed seed data createdAt timestamp
@@ -131,9 +132,65 @@ const deleteSystemScholarships = async () => {
 };
 
 /**
+ * Remove duplicate system scholarships that share the same seed identity/fingerprint
+ * Keeps the oldest record and removes newer duplicates plus their checklist items.
+ */
+const deduplicateSystemScholarships = async () => {
+  const allScholarships = await getAllScholarships();
+  const systemScholarships = allScholarships.filter((s) => s.createdBy === 'system');
+
+  const groups = new Map();
+  for (const scholarship of systemScholarships) {
+    const key = [
+      scholarship.seedSourceId ?? 'no-seed-id',
+      scholarship.name ?? '',
+      scholarship.provider ?? '',
+      scholarship.deadline ?? ''
+    ].join('|');
+
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key).push(scholarship);
+  }
+
+  let removedCount = 0;
+
+  for (const [, group] of groups) {
+    if (group.length <= 1) continue;
+
+    // Keep the oldest entry to avoid churn in existing references.
+    const sorted = group.sort((a, b) => {
+      const aTime = new Date(a.createdAt || 0).getTime();
+      const bTime = new Date(b.createdAt || 0).getTime();
+      return aTime - bTime;
+    });
+
+    const duplicates = sorted.slice(1);
+
+    for (const duplicate of duplicates) {
+      const checklistItems = await getChecklistItems(duplicate.id);
+      for (const item of checklistItems) {
+        await deleteChecklistItem(item.id);
+      }
+
+      await deleteScholarship(duplicate.id);
+      removedCount += 1;
+      console.log(`-> Removed duplicate system scholarship "${duplicate.name}" (ID ${duplicate.id})`);
+    }
+  }
+
+  if (removedCount > 0) {
+    console.log(`Removed ${removedCount} duplicate system scholarships`);
+  }
+};
+
+/**
  * Import seed scholarships with createdBy: 'system' marker
  */
 const importSeedScholarships = async (scholarships, checklistItems) => {
+  const existingScholarships = await getAllScholarships();
+  const existingSystemScholarships = existingScholarships.filter((s) => s.createdBy === 'system');
   const scholarshipIdMap = new Map();
 
   console.log(`Importing ${scholarships.length} seed scholarships...`);
@@ -142,10 +199,27 @@ const importSeedScholarships = async (scholarships, checklistItems) => {
     try {
       const { id, ...scholarshipData } = scholarship;
 
+      const duplicate = existingSystemScholarships.find((existing) => {
+        const hasMatchingSeedId = existing.seedSourceId !== undefined && existing.seedSourceId === id;
+        const hasMatchingFingerprint =
+          existing.name === scholarship.name &&
+          existing.provider === scholarship.provider &&
+          existing.deadline === scholarship.deadline;
+
+        return hasMatchingSeedId || hasMatchingFingerprint;
+      });
+
+      if (duplicate) {
+        scholarshipIdMap.set(id, duplicate.id);
+        console.log(`-> Skipping duplicate seed scholarship "${scholarship.name}" (already exists as ID ${duplicate.id})`);
+        continue;
+      }
+
       // Add createdBy marker to identify this as system data
       const created = await createScholarship({
         ...scholarshipData,
-        createdBy: 'system'
+        createdBy: 'system',
+        seedSourceId: id
       });
 
       scholarshipIdMap.set(id, created.id);
@@ -224,7 +298,7 @@ const importSeedTemplates = async (templates) => {
  * - On createdAt change: reimports seed scholarships, preserves user data
  * - On same createdAt: does nothing
  */
-export const seedDatabase = async () => {
+const runSeedDatabase = async () => {
   try {
     console.log('=== SEED DATABASE: Starting timestamp check ===');
     console.log('Seed data loaded:', {
@@ -250,6 +324,8 @@ export const seedDatabase = async () => {
       throw new Error('Seed data scholarships array is missing or invalid');
     }
     
+    await deduplicateSystemScholarships();
+
     const allScholarships = await getAllScholarships();
     const isFirstTime = allScholarships.length === 0;
     const needsUpdate = await needsSeedUpdate();
@@ -326,6 +402,19 @@ export const seedDatabase = async () => {
     console.error('createdAt was NOT stored due to import failure');
     throw error;
   }
+};
+
+export const seedDatabase = async () => {
+  if (seedDatabaseInFlight) {
+    console.log('=== SEED DATABASE: Reusing in-flight seed operation ===');
+    return seedDatabaseInFlight;
+  }
+
+  seedDatabaseInFlight = runSeedDatabase().finally(() => {
+    seedDatabaseInFlight = null;
+  });
+
+  return seedDatabaseInFlight;
 };
 
 /**
