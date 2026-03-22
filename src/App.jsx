@@ -9,7 +9,7 @@ import CalendarView from './components/CalendarView';
 import ThemeToggle from './components/ThemeToggle';
 import MobileMenu from './components/MobileMenu';
 import BottomNav from './components/BottomNav';
-import { getAllScholarships, createScholarship, updateScholarship, deleteScholarship, getChecklistItems, createChecklistItem, updateChecklistItem, deleteChecklistItem, reorderChecklistItems, getAllDocuments } from './db/indexeddb';
+import { getAllScholarships, createScholarship, updateScholarship, deleteScholarship, getChecklistItems, createChecklistItem, createChecklistItemsBulk, updateChecklistItem, deleteChecklistItem, reorderChecklistItems, getAllDocuments } from './db/indexeddb';
 import { seedDatabase } from './utils/seedDatabase';
 import TemplateManager from './components/TemplateManager';
 
@@ -25,6 +25,36 @@ function App() {
   const [checklistItemsByScholarship, setChecklistItemsByScholarship] = useState({});
   const [loading, setLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const normalizeChecklistItemFlags = useCallback((item) => {
+    const conditional = Boolean(item?.conditional);
+    let required;
+
+    if (item?.required === undefined) {
+      required = !conditional;
+    } else {
+      required = Boolean(item.required);
+    }
+
+    if (conditional) {
+      required = false;
+    }
+
+    if (!required && !conditional) {
+      required = true;
+    }
+
+    const parsedCopies = Number(item?.copies_required);
+    const copies_required = Number.isFinite(parsedCopies) && parsedCopies >= 1
+      ? Math.floor(parsedCopies)
+      : 1;
+
+    return {
+      required,
+      conditional,
+      copies_required,
+    };
+  }, []);
 
   useEffect(() => {
     seedDatabase().then(() => {
@@ -83,15 +113,17 @@ function App() {
       const scholarship = await createScholarship(data);
       
       if (template && template.items && template.items.length > 0) {
-        for (let i = 0; i < template.items.length; i++) {
-          const item = template.items[i];
-          await createChecklistItem(scholarship.id, {
+        const itemsToCreate = template.items.map((item, index) => {
+          const flags = normalizeChecklistItemFlags(item);
+          return {
             text: item.text,
             note: item.note || '',
-            order: i,
-            checked: false
-          });
-        }
+            order: index,
+            checked: false,
+            ...flags,
+          };
+        });
+        await createChecklistItemsBulk(scholarship.id, itemsToCreate);
       }
       
       await loadScholarships();
@@ -100,7 +132,7 @@ function App() {
     } catch (error) {
       console.error('Error creating scholarship:', error);
     }
-  }, []);
+  }, [normalizeChecklistItemFlags]);
 
   const handleUpdateScholarship = useCallback(async (data) => {
     try {
@@ -194,6 +226,19 @@ function App() {
       await loadAllChecklistItems();
     } catch (error) {
       console.error('Error creating checklist item:', error);
+    }
+  }, [currentChecklistScholarship, loadAllChecklistItems]);
+
+  const handleCreateChecklistItemsBulk = useCallback(async (itemsData) => {
+    if (!currentChecklistScholarship || !Array.isArray(itemsData) || itemsData.length === 0) return;
+
+    try {
+      await createChecklistItemsBulk(currentChecklistScholarship.id, itemsData);
+      const items = await getChecklistItems(currentChecklistScholarship.id);
+      setChecklistItems(items);
+      await loadAllChecklistItems();
+    } catch (error) {
+      console.error('Error creating checklist items in bulk:', error);
     }
   }, [currentChecklistScholarship, loadAllChecklistItems]);
 
@@ -419,6 +464,7 @@ function App() {
               onBack={handleCancel}
               checklistItems={checklistItems}
               onCreateItem={handleCreateChecklistItem}
+              onCreateItemsBulk={handleCreateChecklistItemsBulk}
               onUpdateItem={handleUpdateChecklistItem}
               onDeleteItem={handleDeleteChecklistItem}
               onReorderItems={handleReorderChecklistItems}
