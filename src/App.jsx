@@ -6,6 +6,7 @@ import ChecklistView from './components/ChecklistView';
 import DocumentTracker from './components/DocumentTracker';
 import DataManagement from './components/DataManagement';
 import CalendarView from './components/CalendarView';
+import TimelineView from './components/TimelineView';
 import ThemeToggle from './components/ThemeToggle';
 import MobileMenu from './components/MobileMenu';
 import BottomNav from './components/BottomNav';
@@ -23,8 +24,29 @@ function App() {
   const [currentChecklistScholarship, setCurrentChecklistScholarship] = useState(null);
   const [checklistItems, setChecklistItems] = useState([]);
   const [checklistItemsByScholarship, setChecklistItemsByScholarship] = useState({});
+  const [independentTimelineTasks, setIndependentTimelineTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  const getDateOnly = useCallback((value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toISOString().slice(0, 10);
+  }, []);
+
+  const addDays = useCallback((dateString, days) => {
+    const date = new Date(dateString);
+    date.setDate(date.getDate() + days);
+    return date.toISOString().slice(0, 10);
+  }, []);
+
+  const dayDiff = useCallback((fromDate, toDate) => {
+    const msInDay = 24 * 60 * 60 * 1000;
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+    return Math.round((to - from) / msInDay);
+  }, []);
 
   const normalizeChecklistItemFlags = useCallback((item) => {
     const conditional = Boolean(item?.conditional);
@@ -60,12 +82,39 @@ function App() {
     seedDatabase().then(() => {
       loadScholarships();
       loadDocuments();
+      loadIndependentTimelineTasks();
     }).catch(error => {
       console.error('Error seeding database:', error);
       loadScholarships();
       loadDocuments();
+      loadIndependentTimelineTasks();
     });
   }, []);
+
+  const loadIndependentTimelineTasks = async () => {
+    try {
+      const items = await getChecklistItems(null);
+      const normalized = items
+        .filter((item) => item.scholarshipId == null)
+        .map((item) => {
+          const dueDate = getDateOnly(item.dueDate);
+          const startDate = getDateOnly(item.startDate) || dueDate;
+          return {
+            ...item,
+            startDate,
+            dueDate,
+          };
+        })
+        .filter((item) => item.startDate && item.dueDate)
+        .sort((a, b) => {
+          if (a.startDate !== b.startDate) return a.startDate.localeCompare(b.startDate);
+          return (a.order || 0) - (b.order || 0);
+        });
+      setIndependentTimelineTasks(normalized);
+    } catch (error) {
+      console.error('Error loading independent timeline tasks:', error);
+    }
+  };
 
   const loadAllChecklistItems = async () => {
     try {
@@ -184,7 +233,7 @@ function App() {
 
   const handleTabChange = useCallback((tab) => {
     setMainTab(tab);
-    setView(tab === 'scholarships' ? 'list' : 'dashboard');
+    setView(tab === 'scholarships' ? 'list' : tab === 'timeline' ? 'timeline' : 'dashboard');
     handleMobileMenuClose();
   }, [handleMobileMenuClose]);
 
@@ -279,6 +328,120 @@ function App() {
     }
   }, [currentChecklistScholarship, loadAllChecklistItems]);
 
+  const handleShiftTimelineScholarship = useCallback(async (id, newDeadline) => {
+    try {
+      await updateScholarship(id, { deadline: newDeadline });
+      await loadScholarships();
+    } catch (error) {
+      console.error('Error shifting scholarship deadline from timeline:', error);
+    }
+  }, []);
+
+  const handleCreateIndependentTimelineTask = useCallback(async (data) => {
+    try {
+      await createChecklistItem(null, {
+        text: data.text,
+        checked: data.taskStatus === 'completed',
+        note: data.note || '',
+        required: true,
+        conditional: false,
+        copies_required: 1,
+        startDate: data.startDate,
+        dueDate: data.dueDate,
+        taskType: 'independent',
+        taskStatus: data.taskStatus || 'pending',
+        priority: Number(data.priority) || 3,
+        dependencyIds: [],
+      });
+      await loadIndependentTimelineTasks();
+    } catch (error) {
+      console.error('Error creating independent timeline task:', error);
+    }
+  }, []);
+
+  const handleUpdateIndependentTimelineTask = useCallback(async (id, data) => {
+    try {
+      const payload = {
+        ...data,
+      };
+
+      if (data.taskStatus) {
+        payload.checked = data.taskStatus === 'completed';
+      }
+
+      await updateChecklistItem(id, payload);
+      await loadIndependentTimelineTasks();
+    } catch (error) {
+      console.error('Error updating independent timeline task:', error);
+    }
+  }, []);
+
+  const handleDeleteIndependentTimelineTask = useCallback(async (id) => {
+    try {
+      await deleteChecklistItem(id);
+      await loadIndependentTimelineTasks();
+    } catch (error) {
+      console.error('Error deleting independent timeline task:', error);
+    }
+  }, []);
+
+  const handleMoveIndependentTimelineTask = useCallback(async (id, newStartDate) => {
+    try {
+      const task = independentTimelineTasks.find((item) => item.id === id);
+      if (!task) return;
+      const durationDays = Math.max(0, dayDiff(task.startDate, task.dueDate));
+      const nextStartDate = getDateOnly(newStartDate);
+      const nextDueDate = addDays(nextStartDate, durationDays);
+      await updateChecklistItem(id, {
+        startDate: nextStartDate,
+        dueDate: nextDueDate,
+      });
+      await loadIndependentTimelineTasks();
+    } catch (error) {
+      console.error('Error moving independent timeline task:', error);
+    }
+  }, [independentTimelineTasks, dayDiff, getDateOnly, addDays]);
+
+  const handleResizeIndependentTimelineTaskStart = useCallback(async (id, nextStartDate) => {
+    try {
+      const task = independentTimelineTasks.find((item) => item.id === id);
+      if (!task) return;
+
+      const normalizedStart = getDateOnly(nextStartDate);
+      const clampedStart = normalizedStart > task.dueDate ? task.dueDate : normalizedStart;
+
+      await updateChecklistItem(id, {
+        startDate: clampedStart,
+      });
+      await loadIndependentTimelineTasks();
+    } catch (error) {
+      console.error('Error resizing independent task start date:', error);
+    }
+  }, [independentTimelineTasks, getDateOnly]);
+
+  const handleResizeIndependentTimelineTaskEnd = useCallback(async (id, nextDueDate) => {
+    try {
+      const task = independentTimelineTasks.find((item) => item.id === id);
+      if (!task) return;
+
+      const normalizedEnd = getDateOnly(nextDueDate);
+      const clampedEnd = normalizedEnd < task.startDate ? task.startDate : normalizedEnd;
+
+      await updateChecklistItem(id, {
+        dueDate: clampedEnd,
+      });
+      await loadIndependentTimelineTasks();
+    } catch (error) {
+      console.error('Error resizing independent task end date:', error);
+    }
+  }, [independentTimelineTasks, getDateOnly]);
+
+  const handleTimelineEdit = useCallback((scholarship) => {
+    setMainTab('scholarships');
+    setEditingScholarship(scholarship);
+    setView('form');
+  }, []);
+
   const handleUpdateChecklistScholarshipNote = useCallback(async (scholarshipId, note) => {
     try {
       await updateScholarship(scholarshipId, { note });
@@ -297,6 +460,7 @@ function App() {
     await loadScholarships();
     await loadDocuments();
     await loadAllChecklistItems();
+    await loadIndependentTimelineTasks();
   }, []);
 
   const handleSave = useCallback((data, template = null) => {
@@ -320,6 +484,13 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <MobileMenu
+        activeTab={mainTab}
+        onTabChange={handleTabChange}
+        isVisible={isMobileMenuOpen}
+        onClose={handleMobileMenuClose}
+      />
+
       <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-4">
@@ -396,6 +567,19 @@ function App() {
             </button>
             <button
               onClick={() => {
+                setMainTab('timeline');
+                handleCancel();
+              }}
+              className={`px-4 py-2 font-medium text-sm transition-colors ${
+                mainTab === 'timeline'
+                  ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                  : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              Timeline
+            </button>
+            <button
+              onClick={() => {
                 setMainTab('documents');
                 clearDocumentTrackerEditId();
                 handleCancel();
@@ -438,7 +622,7 @@ function App() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-8">
         {mainTab === 'dashboard' ? (
           <DashboardView
             scholarships={scholarships}
@@ -486,6 +670,19 @@ function App() {
             onViewChecklist={handleViewChecklist}
             onEdit={handleEdit}
           />
+        ) : mainTab === 'timeline' ? (
+          <TimelineView
+            scholarships={scholarships}
+            independentTasks={independentTimelineTasks}
+            onShiftTask={handleShiftTimelineScholarship}
+            onCreateIndependentTask={handleCreateIndependentTimelineTask}
+            onUpdateIndependentTask={handleUpdateIndependentTimelineTask}
+            onDeleteIndependentTask={handleDeleteIndependentTimelineTask}
+            onMoveIndependentTask={handleMoveIndependentTimelineTask}
+            onResizeIndependentTaskStart={handleResizeIndependentTimelineTaskStart}
+            onResizeIndependentTaskEnd={handleResizeIndependentTimelineTaskEnd}
+            onEdit={handleTimelineEdit}
+          />
         ) : mainTab === 'templates' ? (
           <TemplateManager onTemplateUpdate={() => {}} />
         ) : mainTab === 'data' ? (
@@ -508,6 +705,8 @@ function App() {
           </p>
         </div>
       </footer>
+
+      <BottomNav activeTab={mainTab} onTabChange={handleTabChange} />
     </div>
   );
 }

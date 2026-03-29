@@ -282,10 +282,10 @@ const DataManagement = ({ onImportComplete }) => {
             <button
               onClick={clearStatusMessage}
               className={`text-sm ${
-                statusType === 'success' ? 'text-green-400 hover:text-green-600' :
-                statusType === 'error' ? 'text-red-400 hover:text-red-600' :
-                statusType === 'warning' ? 'text-yellow-400 hover:text-yellow-600' :
-                'text-blue-400 hover:text-blue-600'
+                statusType === 'success' ? 'text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-300' :
+                statusType === 'error' ? 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300' :
+                statusType === 'warning' ? 'text-yellow-600 dark:text-yellow-400 hover:text-yellow-700 dark:hover:text-yellow-300' :
+                'text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300'
               }`}
             >
               <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
