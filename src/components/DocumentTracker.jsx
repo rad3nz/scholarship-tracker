@@ -174,7 +174,7 @@ const DocumentTracker = ({
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Document Tracker</h1>
           <button
             onClick={handleAddDocument}
-            className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors font-medium"
+            className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition-colors font-medium"
           >
             + Add Document
           </button>

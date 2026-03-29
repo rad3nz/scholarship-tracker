@@ -29,6 +29,15 @@ const BottomNav = ({ activeTab, onTabChange }) => {
         </svg>
       )
     },
+    {
+      id: 'timeline',
+      label: 'Timeline',
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5v14m6-10v10M3 8h18M3 16h18" />
+        </svg>
+      )
+    },
     { 
       id: 'documents', 
       label: 'Documents', 

@@ -101,7 +101,7 @@ const DocumentRequirements = ({ scholarship, documents = [], onViewDocument }) =
                         href={doc.fileLink}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:underline break-all mt-1 inline-block"
+                        className="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline break-all mt-1 inline-block"
                         onClick={(e) => {
                           if (doc.fileLink && !doc.fileLink.startsWith('http')) {
                             e.preventDefault();

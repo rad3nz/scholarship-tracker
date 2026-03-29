@@ -107,7 +107,7 @@ const DocumentCard = ({
                 href={document.fileLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 hover:underline break-all"
+                className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:underline break-all"
                 onClick={(e) => {
                   if (!document.fileLink.startsWith('http')) {
                     e.preventDefault();

@@ -29,7 +29,7 @@ const CalendarLegend = ({ scholarships }) => {
             className={`flex items-center gap-2 p-2 rounded-lg ${item.bgColor}`}
           >
             <div
-              className="w-3 h-3 rounded-full flex-shrink-0"
+              className="w-3 h-3 rounded-full flex-shrink-0 ring-1 ring-white dark:ring-gray-900"
               style={{ backgroundColor: item.color }}
             />
             <div className="flex-1 min-w-0">
