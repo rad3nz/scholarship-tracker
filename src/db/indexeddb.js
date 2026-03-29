@@ -1,5 +1,5 @@
 const DB_NAME = 'ScholarshipTrackerDB';
-const DB_VERSION = 7;
+const DB_VERSION = 9;
 const STORE_NAME = 'scholarships';
 const CHECKLIST_STORE_NAME = 'checklistItems';
 const DOCUMENTS_STORE_NAME = 'documents';
@@ -7,6 +7,30 @@ const TEMPLATES_STORE_NAME = 'templates';
 const METADATA_STORE_NAME = 'metadata';
 
 let db = null;
+
+const TIMELINE_TYPES = new Set(['checklist', 'milestone', 'independent']);
+const TIMELINE_STATUSES = new Set(['pending', 'in_progress', 'completed']);
+
+const normalizeDateOnly = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toISOString().slice(0, 10);
+};
+
+const normalizeDependencyIds = (value) => {
+  if (!Array.isArray(value)) return [];
+  const ids = value
+    .map((id) => Number(id))
+    .filter((id) => Number.isFinite(id));
+  return Array.from(new Set(ids));
+};
+
+const createIndexIfMissing = (objectStore, name, keyPath, options = { unique: false }) => {
+  if (!objectStore.indexNames.contains(name)) {
+    objectStore.createIndex(name, keyPath, options);
+  }
+};
 
 const normalizeRequiredDocumentIds = (value) => {
   if (!Array.isArray(value)) return [];
@@ -59,12 +83,36 @@ const normalizeChecklistItem = (item) => {
     ? Math.floor(parsedCopies)
     : 1;
 
+  const dueDate = normalizeDateOnly(item.dueDate);
+  const startDate = normalizeDateOnly(item.startDate) || dueDate;
+  const timelineType = TIMELINE_TYPES.has(item.taskType)
+    ? item.taskType
+    : (item.scholarshipId == null ? 'independent' : 'checklist');
+  const parsedPriority = Number(item.priority);
+  const priority = Number.isFinite(parsedPriority)
+    ? Math.min(5, Math.max(1, Math.floor(parsedPriority)))
+    : 3;
+  const taskStatus = TIMELINE_STATUSES.has(item.taskStatus)
+    ? item.taskStatus
+    : (item.checked ? 'completed' : 'pending');
+  const completedAt = taskStatus === 'completed'
+    ? (item.completedAt || new Date().toISOString())
+    : '';
+
   return {
     ...item,
+    scholarshipId: item.scholarshipId ?? null,
     note: typeof item.note === 'string' ? item.note : '',
     required,
     conditional,
     copies_required,
+    startDate,
+    dueDate,
+    taskType: timelineType,
+    priority,
+    taskStatus,
+    completedAt,
+    dependencyIds: normalizeDependencyIds(item.dependencyIds),
   };
 };
 
@@ -123,6 +171,11 @@ export const initDB = () => {
         const checklistStore = db.createObjectStore(CHECKLIST_STORE_NAME, { keyPath: 'id', autoIncrement: true });
         checklistStore.createIndex('scholarshipId', 'scholarshipId', { unique: false });
         checklistStore.createIndex('order', 'order', { unique: false });
+        checklistStore.createIndex('startDate', 'startDate', { unique: false });
+        checklistStore.createIndex('dueDate', 'dueDate', { unique: false });
+        checklistStore.createIndex('taskType', 'taskType', { unique: false });
+        checklistStore.createIndex('taskStatus', 'taskStatus', { unique: false });
+        checklistStore.createIndex('priority', 'priority', { unique: false });
         console.log('Object store created:', CHECKLIST_STORE_NAME);
       }
       if (!db.objectStoreNames.contains(DOCUMENTS_STORE_NAME)) {
@@ -187,6 +240,54 @@ export const initDB = () => {
 
           cursor.continue();
         };
+      }
+
+      if (oldVersion < 8 && transaction && db.objectStoreNames.contains(CHECKLIST_STORE_NAME)) {
+        const checklistStore = transaction.objectStore(CHECKLIST_STORE_NAME);
+
+        createIndexIfMissing(checklistStore, 'startDate', 'startDate', { unique: false });
+        createIndexIfMissing(checklistStore, 'dueDate', 'dueDate', { unique: false });
+        createIndexIfMissing(checklistStore, 'taskType', 'taskType', { unique: false });
+        createIndexIfMissing(checklistStore, 'taskStatus', 'taskStatus', { unique: false });
+        createIndexIfMissing(checklistStore, 'priority', 'priority', { unique: false });
+
+        const cursorRequest = checklistStore.openCursor();
+
+        cursorRequest.onsuccess = (cursorEvent) => {
+          const cursor = cursorEvent.target.result;
+          if (!cursor) {
+            return;
+          }
+
+          const value = cursor.value;
+          const normalized = normalizeChecklistItem(value);
+
+          if (
+            value.startDate !== normalized.startDate ||
+            value.dueDate !== normalized.dueDate ||
+            value.taskType !== normalized.taskType ||
+            value.taskStatus !== normalized.taskStatus ||
+            value.priority !== normalized.priority ||
+            value.completedAt !== normalized.completedAt ||
+            value.dependencyIds !== normalized.dependencyIds ||
+            value.scholarshipId !== normalized.scholarshipId
+          ) {
+            cursor.update(normalized);
+          }
+
+          cursor.continue();
+        };
+      }
+
+      if (oldVersion < 9 && transaction && db.objectStoreNames.contains(CHECKLIST_STORE_NAME)) {
+        const checklistStore = transaction.objectStore(CHECKLIST_STORE_NAME);
+        const legacyTimelineIndexes = ['startDate', 'dueDate', 'taskType', 'taskStatus', 'priority'];
+
+        legacyTimelineIndexes.forEach((indexName) => {
+          if (checklistStore.indexNames.contains(indexName)) {
+            checklistStore.deleteIndex(indexName);
+          }
+        });
       }
     };
   });
@@ -328,18 +429,63 @@ export const deleteScholarship = (id) => {
   return new Promise(async (resolve, reject) => {
     try {
       await initDB();
-      const transaction = db.transaction([STORE_NAME], 'readwrite');
+      const transaction = db.transaction([STORE_NAME, CHECKLIST_STORE_NAME], 'readwrite');
       const objectStore = transaction.objectStore(STORE_NAME);
+      const checklistStore = transaction.objectStore(CHECKLIST_STORE_NAME);
+      const checklistIndex = checklistStore.index('scholarshipId');
       const request = objectStore.delete(id);
-
-      request.onsuccess = () => {
-        console.log('Scholarship deleted:', id);
-        resolve();
-      };
 
       request.onerror = () => {
         console.error('Error deleting scholarship:', request.error);
         reject(request.error);
+      };
+
+      const cleanupRequest = checklistStore.getAll();
+      cleanupRequest.onsuccess = () => {
+        const allItems = cleanupRequest.result || [];
+        const dependentItems = allItems.filter((item) => normalizeDependencyIds(item.dependencyIds).length > 0);
+        const removedIds = new Set(
+          allItems
+            .filter((item) => item.scholarshipId === id)
+            .map((item) => item.id)
+        );
+
+        dependentItems.forEach((item) => {
+          const nextDependencies = normalizeDependencyIds(item.dependencyIds).filter((depId) => !removedIds.has(depId));
+          if (nextDependencies.length !== normalizeDependencyIds(item.dependencyIds).length) {
+            checklistStore.put({
+              ...item,
+              dependencyIds: nextDependencies,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        });
+      };
+
+      cleanupRequest.onerror = () => {
+        console.error('Error cleaning timeline dependencies:', cleanupRequest.error);
+      };
+
+      const checklistRequest = checklistIndex.getAll(id);
+      checklistRequest.onsuccess = () => {
+        const items = checklistRequest.result || [];
+        items.forEach((item) => {
+          checklistStore.delete(item.id);
+        });
+      };
+
+      checklistRequest.onerror = () => {
+        console.error('Error deleting checklist items for scholarship:', checklistRequest.error);
+      };
+
+      transaction.oncomplete = () => {
+        console.log('Scholarship deleted:', id);
+        resolve();
+      };
+
+      transaction.onerror = () => {
+        console.error('Delete scholarship transaction error:', transaction.error);
+        reject(transaction.error);
       };
     } catch (error) {
       reject(error);
@@ -417,7 +563,7 @@ export const createChecklistItem = (scholarshipId, data) => {
       const objectStore = transaction.objectStore(CHECKLIST_STORE_NAME);
 
       const checklistItem = normalizeChecklistItem({
-        scholarshipId,
+        scholarshipId: scholarshipId ?? null,
         text: data.text,
         checked: data.checked || false,
         note: data.note || '',
@@ -425,6 +571,12 @@ export const createChecklistItem = (scholarshipId, data) => {
         required: data.required,
         conditional: data.conditional,
         copies_required: data.copies_required,
+        startDate: data.startDate,
+        dueDate: data.dueDate,
+        taskType: data.taskType,
+        taskStatus: data.taskStatus,
+        priority: data.priority,
+        dependencyIds: data.dependencyIds,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
@@ -452,11 +604,17 @@ export const getChecklistItems = (scholarshipId) => {
       await initDB();
       const transaction = db.transaction([CHECKLIST_STORE_NAME], 'readonly');
       const objectStore = transaction.objectStore(CHECKLIST_STORE_NAME);
-      const index = objectStore.index('scholarshipId');
-      const request = index.getAll(scholarshipId);
+      const isIndependentQuery = scholarshipId == null;
+      const request = isIndependentQuery
+        ? objectStore.getAll()
+        : objectStore.index('scholarshipId').getAll(scholarshipId);
 
       request.onsuccess = () => {
-        const items = request.result
+        const rawItems = request.result || [];
+        const filteredItems = isIndependentQuery
+          ? rawItems.filter((item) => item?.scholarshipId == null)
+          : rawItems;
+        const items = filteredItems
           .map(normalizeChecklistItem)
           .sort((a, b) => a.order - b.order);
         console.log('Retrieved checklist items:', items.length, 'for scholarship:', scholarshipId);
@@ -467,6 +625,74 @@ export const getChecklistItems = (scholarshipId) => {
         console.error('Error getting checklist items:', request.error);
         reject(request.error);
       };
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
+export const getAllChecklistItems = () => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      await initDB();
+      const transaction = db.transaction([CHECKLIST_STORE_NAME], 'readonly');
+      const objectStore = transaction.objectStore(CHECKLIST_STORE_NAME);
+      const request = objectStore.getAll();
+
+      request.onsuccess = () => {
+        const items = request.result
+          .map(normalizeChecklistItem)
+          .sort((a, b) => {
+            const dueA = a.dueDate || '';
+            const dueB = b.dueDate || '';
+            if (dueA !== dueB) return dueA.localeCompare(dueB);
+            return (a.order || 0) - (b.order || 0);
+          });
+        resolve(items);
+      };
+
+      request.onerror = () => {
+        console.error('Error getting all checklist items:', request.error);
+        reject(request.error);
+      };
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
+export const getTimelineTasks = ({ startDate, endDate } = {}) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const items = await getAllChecklistItems();
+      const normalizedStart = normalizeDateOnly(startDate);
+      const normalizedEnd = normalizeDateOnly(endDate);
+
+      const filtered = items.filter((item) => {
+        const taskStart = item.startDate || item.dueDate;
+        const taskEnd = item.dueDate || item.startDate;
+
+        if (!taskStart || !taskEnd) {
+          return item.scholarshipId == null;
+        }
+
+        if (normalizedStart && taskEnd < normalizedStart) return false;
+        if (normalizedEnd && taskStart > normalizedEnd) return false;
+        return true;
+      });
+
+      resolve(filtered);
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
+export const getIndependentTimelineTasks = () => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const items = await getChecklistItems(null);
+      resolve(items.filter((item) => item.taskType === 'independent' || item.scholarshipId == null));
     } catch (error) {
       reject(error);
     }
@@ -492,6 +718,9 @@ export const updateChecklistItem = (id, data) => {
         const updated = normalizeChecklistItem({
           ...existing,
           ...data,
+          completedAt: data?.taskStatus === 'completed'
+            ? (existing.completedAt || new Date().toISOString())
+            : (data?.taskStatus ? '' : existing.completedAt),
           updatedAt: new Date().toISOString()
         });
 
@@ -615,6 +844,12 @@ export const createChecklistItemsBulk = (scholarshipId, itemsData) => {
           required: item.required,
           conditional: item.conditional,
           copies_required: item.copies_required,
+          startDate: item.startDate,
+          dueDate: item.dueDate,
+          taskType: item.taskType,
+          taskStatus: item.taskStatus,
+          priority: item.priority,
+          dependencyIds: item.dependencyIds,
         }));
 
       if (normalizedItems.length === 0) {
@@ -654,6 +889,12 @@ export const createChecklistItemsBulk = (scholarshipId, itemsData) => {
             required: item.required,
             conditional: item.conditional,
             copies_required: item.copies_required,
+            startDate: item.startDate,
+            dueDate: item.dueDate,
+            taskType: item.taskType,
+            taskStatus: item.taskStatus,
+            priority: item.priority,
+            dependencyIds: item.dependencyIds,
             order: maxOrder + indexInBatch + 1,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -677,6 +918,116 @@ export const createChecklistItemsBulk = (scholarshipId, itemsData) => {
 
       getExistingRequest.onerror = () => {
         fail(getExistingRequest.error || new Error('Failed to load existing checklist items'));
+      };
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
+export const shiftTimelineTaskWithDependents = (taskId, newStartDate) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const allItems = await getAllChecklistItems();
+      const taskMap = new Map(allItems.map((item) => [item.id, item]));
+      const sourceTask = taskMap.get(taskId);
+
+      if (!sourceTask) {
+        reject(new Error('Task not found'));
+        return;
+      }
+
+      const sourceCurrentStart = sourceTask.startDate || sourceTask.dueDate;
+      const sourceCurrentDue = sourceTask.dueDate || sourceTask.startDate;
+      const normalizedNewStart = normalizeDateOnly(newStartDate);
+
+      if (!sourceCurrentStart || !sourceCurrentDue || !normalizedNewStart) {
+        reject(new Error('Task date range is invalid'));
+        return;
+      }
+
+      const msInDay = 24 * 60 * 60 * 1000;
+      const dayDelta = Math.round((new Date(normalizedNewStart) - new Date(sourceCurrentStart)) / msInDay);
+
+      if (dayDelta === 0) {
+        resolve([]);
+        return;
+      }
+
+      const reverseGraph = new Map();
+      allItems.forEach((item) => {
+        normalizeDependencyIds(item.dependencyIds).forEach((dependencyId) => {
+          if (!reverseGraph.has(dependencyId)) {
+            reverseGraph.set(dependencyId, []);
+          }
+          reverseGraph.get(dependencyId).push(item.id);
+        });
+      });
+
+      const queue = [taskId];
+      const visited = new Set();
+      const idsToShift = [];
+
+      while (queue.length > 0) {
+        const currentId = queue.shift();
+        if (visited.has(currentId)) continue;
+        visited.add(currentId);
+        idsToShift.push(currentId);
+
+        const children = reverseGraph.get(currentId) || [];
+        children.forEach((childId) => {
+          if (!visited.has(childId)) {
+            queue.push(childId);
+          }
+        });
+      }
+
+      const shiftDate = (value) => {
+        const normalized = normalizeDateOnly(value);
+        if (!normalized) return '';
+        const date = new Date(normalized);
+        date.setDate(date.getDate() + dayDelta);
+        return date.toISOString().slice(0, 10);
+      };
+
+      const updates = idsToShift
+        .map((id) => {
+          const task = taskMap.get(id);
+          if (!task) return null;
+          const nextStartDate = shiftDate(task.startDate || task.dueDate);
+          const nextDueDate = shiftDate(task.dueDate || task.startDate);
+          return {
+            id,
+            startDate: nextStartDate,
+            dueDate: nextDueDate,
+            updatedAt: new Date().toISOString(),
+          };
+        })
+        .filter(Boolean);
+
+      const transaction = db.transaction([CHECKLIST_STORE_NAME], 'readwrite');
+      const objectStore = transaction.objectStore(CHECKLIST_STORE_NAME);
+
+      updates.forEach((entry) => {
+        const getRequest = objectStore.get(entry.id);
+        getRequest.onsuccess = () => {
+          const existing = getRequest.result;
+          if (!existing) return;
+          objectStore.put(normalizeChecklistItem({
+            ...existing,
+            startDate: entry.startDate,
+            dueDate: entry.dueDate,
+            updatedAt: entry.updatedAt,
+          }));
+        };
+      });
+
+      transaction.oncomplete = () => {
+        resolve(updates);
+      };
+
+      transaction.onerror = () => {
+        reject(transaction.error || new Error('Failed to shift timeline tasks'));
       };
     } catch (error) {
       reject(error);
