@@ -6,12 +6,25 @@ import ChecklistView from './components/ChecklistView';
 import DocumentTracker from './components/DocumentTracker';
 import DataManagement from './components/DataManagement';
 import CalendarView from './components/CalendarView';
+import ResponsiveCalendarView from './components/ResponsiveCalendarView';
 import TimelineView from './components/TimelineView';
 import ThemeToggle from './components/ThemeToggle';
 import MobileMenu from './components/MobileMenu';
 import BottomNav from './components/BottomNav';
+import ReminderTray from './components/ReminderTray';
 import { getAllScholarships, createScholarship, updateScholarship, deleteScholarship, getChecklistItems, createChecklistItem, createChecklistItemsBulk, updateChecklistItem, deleteChecklistItem, reorderChecklistItems, getAllDocuments } from './db/indexeddb';
 import { seedDatabase } from './utils/seedDatabase';
+import {
+  DEFAULT_REMINDER_PREFERENCES,
+  evaluateReminders,
+  loadDismissedReminders,
+  loadReminderPreferences,
+  notifyBrowserReminder,
+  requestBrowserNotificationPermission,
+  saveDismissedReminders,
+  saveReminderPreferences,
+  snoozeReminderUntil,
+} from './utils/reminders';
 import TemplateManager from './components/TemplateManager';
 
 function App() {
@@ -27,6 +40,10 @@ function App() {
   const [independentTimelineTasks, setIndependentTimelineTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(() => window.innerWidth < 768);
+  const [reminderPreferences, setReminderPreferences] = useState(() => loadReminderPreferences());
+  const [dismissedReminders, setDismissedReminders] = useState(() => loadDismissedReminders());
+  const [activeReminders, setActiveReminders] = useState([]);
 
   const getDateOnly = useCallback((value) => {
     if (!value) return '';
@@ -90,6 +107,39 @@ function App() {
       loadIndependentTimelineTasks();
     });
   }, []);
+
+  useEffect(() => {
+    const onResize = () => {
+      setIsMobileViewport(window.innerWidth < 768);
+    };
+
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  useEffect(() => {
+    saveReminderPreferences(reminderPreferences);
+  }, [reminderPreferences]);
+
+  useEffect(() => {
+    saveDismissedReminders(dismissedReminders);
+  }, [dismissedReminders]);
+
+  useEffect(() => {
+    const runReminderCheck = () => {
+      const reminders = evaluateReminders(scholarships, reminderPreferences, dismissedReminders);
+      setActiveReminders(reminders);
+      reminders.slice(0, 2).forEach((reminder) => {
+        notifyBrowserReminder(reminder);
+      });
+    };
+
+    runReminderCheck();
+
+    const everyMs = Math.max(1, Number(reminderPreferences.pollHours || DEFAULT_REMINDER_PREFERENCES.pollHours)) * 60 * 60 * 1000;
+    const timer = setInterval(runReminderCheck, everyMs);
+    return () => clearInterval(timer);
+  }, [scholarships, reminderPreferences, dismissedReminders]);
 
   const loadIndependentTimelineTasks = async () => {
     try {
@@ -463,6 +513,54 @@ function App() {
     await loadIndependentTimelineTasks();
   }, []);
 
+  const handleToggleReminderEnabled = useCallback(() => {
+    setReminderPreferences((prev) => ({
+      ...prev,
+      enabled: !prev.enabled,
+    }));
+  }, []);
+
+  const handleToggleQuietMode = useCallback(() => {
+    setReminderPreferences((prev) => ({
+      ...prev,
+      quietMode: !prev.quietMode,
+    }));
+  }, []);
+
+  const handleToggleThreshold = useCallback((threshold) => {
+    setReminderPreferences((prev) => {
+      const current = Array.isArray(prev.thresholds) ? prev.thresholds : [];
+      const nextThresholds = current.includes(threshold)
+        ? current.filter((value) => value !== threshold)
+        : [...current, threshold];
+      return {
+        ...prev,
+        thresholds: nextThresholds.length > 0 ? nextThresholds : [7, 3, 1, 0],
+      };
+    });
+  }, []);
+
+  const handleEnableBrowserNotifications = useCallback(async () => {
+    const permission = await requestBrowserNotificationPermission();
+    if (permission === 'denied') {
+      window.alert('Browser notifications are blocked. You can still use in-app reminders.');
+    }
+  }, []);
+
+  const handleDismissReminder = useCallback((reminderKey) => {
+    setDismissedReminders((prev) => ({
+      ...prev,
+      [reminderKey]: new Date('2999-01-01').toISOString(),
+    }));
+  }, []);
+
+  const handleSnoozeReminder = useCallback((reminderKey) => {
+    setDismissedReminders((prev) => ({
+      ...prev,
+      [reminderKey]: snoozeReminderUntil(24),
+    }));
+  }, []);
+
   const handleSave = useCallback((data, template = null) => {
     if (editingScholarship) {
       handleUpdateScholarship(data);
@@ -623,6 +721,18 @@ function App() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 pb-24 md:pb-8">
+        <ReminderTray
+          reminders={activeReminders}
+          preferences={reminderPreferences}
+          onToggleEnabled={handleToggleReminderEnabled}
+          onToggleQuietMode={handleToggleQuietMode}
+          onToggleThreshold={handleToggleThreshold}
+          onEnableBrowserNotifications={handleEnableBrowserNotifications}
+          onDismiss={handleDismissReminder}
+          onSnooze={handleSnoozeReminder}
+          onOpenScholarship={handleViewChecklist}
+        />
+
         {mainTab === 'dashboard' ? (
           <DashboardView
             scholarships={scholarships}
@@ -665,11 +775,19 @@ function App() {
             />
           )
         ) : mainTab === 'calendar' ? (
-          <CalendarView
-            scholarships={scholarships}
-            onViewChecklist={handleViewChecklist}
-            onEdit={handleEdit}
-          />
+          isMobileViewport ? (
+            <ResponsiveCalendarView
+              scholarships={scholarships}
+              onViewChecklist={handleViewChecklist}
+              onEdit={handleEdit}
+            />
+          ) : (
+            <CalendarView
+              scholarships={scholarships}
+              onViewChecklist={handleViewChecklist}
+              onEdit={handleEdit}
+            />
+          )
         ) : mainTab === 'timeline' ? (
           <TimelineView
             scholarships={scholarships}
