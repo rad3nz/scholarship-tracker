@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, startOfWeek, endOfWeek, subMonths, addMonths } from 'date-fns';
-import { groupScholarshipsByDate, formatDate } from '../utils/calendarUtils';
+import { formatDateDisplay } from '../utils/calendarUtils';
+import { groupScholarshipsByDate } from '../utils/filterScholarships';
 
 const ResponsiveCalendarView = ({ scholarships, onViewChecklist, onEdit }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -164,7 +165,7 @@ const ResponsiveCalendarView = ({ scholarships, onViewChecklist, onEdit }) => {
                 <div key={dateStr} className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      {formatDate(dateStr)}
+                      {formatDateDisplay(dateStr)}
                     </h4>
                     <div className="flex items-center">
                       <div className="flex items-center space-x-1 mr-2">

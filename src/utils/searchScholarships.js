@@ -4,22 +4,79 @@
  * @param {string} query - Search query string
  * @returns {Array} Filtered scholarships matching the query
  */
+const parseQueryTokens = (query) => {
+  const terms = query
+    .toLowerCase()
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  const fieldTerms = {
+    status: [],
+    country: [],
+    provider: [],
+  };
+  const generalTerms = [];
+
+  terms.forEach((term) => {
+    if (term.startsWith('status:')) {
+      fieldTerms.status.push(term.slice(7));
+      return;
+    }
+    if (term.startsWith('country:')) {
+      fieldTerms.country.push(term.slice(8));
+      return;
+    }
+    if (term.startsWith('provider:')) {
+      fieldTerms.provider.push(term.slice(9));
+      return;
+    }
+    generalTerms.push(term);
+  });
+
+  return { fieldTerms, generalTerms };
+};
+
+const textIncludes = (value, searchTerm) =>
+  String(value || '').toLowerCase().includes(searchTerm);
+
 export const searchScholarships = (scholarships, query) => {
   if (!query || !query.trim()) {
     return scholarships;
   }
 
-  const searchTerm = query.toLowerCase().trim();
+  const { fieldTerms, generalTerms } = parseQueryTokens(query);
 
   return scholarships.filter((scholarship) => {
-    // Search in name
-    const nameMatch = scholarship.name?.toLowerCase().includes(searchTerm);
-    // Search in provider
-    const providerMatch = scholarship.provider?.toLowerCase().includes(searchTerm);
-    // Search in country
-    const countryMatch = scholarship.country?.toLowerCase().includes(searchTerm);
+    const statusText = String(scholarship.status || '').toLowerCase();
+    const countryText = String(scholarship.country || '').toLowerCase();
+    const providerText = String(scholarship.provider || '').toLowerCase();
 
-    return nameMatch || providerMatch || countryMatch;
+    const fieldMatch =
+      (fieldTerms.status.length === 0 || fieldTerms.status.some((term) => statusText.includes(term))) &&
+      (fieldTerms.country.length === 0 || fieldTerms.country.some((term) => countryText.includes(term))) &&
+      (fieldTerms.provider.length === 0 || fieldTerms.provider.some((term) => providerText.includes(term)));
+
+    if (!fieldMatch) {
+      return false;
+    }
+
+    if (generalTerms.length === 0) {
+      return true;
+    }
+
+    const searchableFields = [
+      scholarship.name,
+      scholarship.provider,
+      scholarship.country,
+      scholarship.status,
+      scholarship.note,
+      scholarship.degree,
+    ];
+
+    return generalTerms.every((term) =>
+      searchableFields.some((value) => textIncludes(value, term))
+    );
   });
 };
 

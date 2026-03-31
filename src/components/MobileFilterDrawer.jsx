@@ -1,5 +1,10 @@
 import { useState, useEffect } from 'react';
-import { filterScholarships } from '../utils/filterScholarships';
+
+const DEADLINE_PRESETS = [
+  { value: 'thisWeek', label: 'This Week' },
+  { value: 'thisMonth', label: 'This Month' },
+  { value: 'thisQuarter', label: 'This Quarter' },
+];
 
 const MobileFilterDrawer = ({ 
   isOpen, 
@@ -7,13 +12,14 @@ const MobileFilterDrawer = ({
   scholarships, 
   onFilterChange, 
   currentFilters,
+  quickPresets = [],
+  onApplyPreset,
   className = ''
 }) => {
   const [tempFilters, setTempFilters] = useState({
     status: [],
     country: [],
-    startDate: null,
-    endDate: null,
+    deadlineRange: null,
     ...currentFilters
   });
 
@@ -48,12 +54,26 @@ const MobileFilterDrawer = ({
     onClose();
   };
 
+  const handleDeadlinePresetChange = (preset) => {
+    setTempFilters((prev) => {
+      if (prev.deadlineRange?.type === preset) {
+        return {
+          ...prev,
+          deadlineRange: null,
+        };
+      }
+      return {
+        ...prev,
+        deadlineRange: { type: preset },
+      };
+    });
+  };
+
   const handleReset = () => {
     const resetFilters = {
       status: [],
       country: [],
-      startDate: null,
-      endDate: null
+      deadlineRange: null,
     };
     setTempFilters(resetFilters);
     onFilterChange(resetFilters);
@@ -68,7 +88,7 @@ const MobileFilterDrawer = ({
         className="absolute inset-0 bg-black bg-opacity-50"
         onClick={onClose}
       />
-      <div className="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 rounded-t-2xl max-h-[80vh] overflow-hidden">
+      <div className={`absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 rounded-t-2xl max-h-[80vh] overflow-hidden ${className}`}>
         {/* Handle bar */}
         <div className="flex justify-center pt-3 pb-2">
           <div className="w-12 h-1.5 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
@@ -87,6 +107,28 @@ const MobileFilterDrawer = ({
 
         {/* Content */}
         <div className="overflow-y-auto max-h-[60vh]"><div className="p-4 space-y-6">
+            {quickPresets.length > 0 && (
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Quick Presets</h4>
+                <div className="flex flex-wrap gap-2">
+                  {quickPresets.map((preset) => (
+                    <button
+                      key={preset.id}
+                      onClick={() => {
+                        if (onApplyPreset) {
+                          onApplyPreset(preset);
+                        }
+                        onClose();
+                      }}
+                      className="px-3 py-1.5 text-xs rounded-full border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200"
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Status Filter */}
             <div>
               <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Status</h4>
@@ -124,6 +166,28 @@ const MobileFilterDrawer = ({
                 </div>
               </div>
             )}
+
+            <div>
+              <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Deadline</h4>
+              <div className="flex flex-wrap gap-2">
+                {DEADLINE_PRESETS.map((preset) => {
+                  const selected = tempFilters.deadlineRange?.type === preset.value;
+                  return (
+                    <button
+                      key={preset.value}
+                      onClick={() => handleDeadlinePresetChange(preset.value)}
+                      className={`px-3 py-1.5 text-xs rounded-full border ${
+                        selected
+                          ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700'
+                          : 'border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200'
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div></div>
 
         {/* Footer Buttons */}
