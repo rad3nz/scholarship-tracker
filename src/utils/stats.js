@@ -3,6 +3,22 @@ export const INACTIVE_DEADLINE_STATUSES = ['Submitted', 'Interview', 'Result'];
 export const hasActiveDeadline = (scholarship) =>
   !INACTIVE_DEADLINE_STATUSES.includes(scholarship?.status);
 
+export const SCHOLARSHIP_STATUS_ORDER = [
+  'Not Started',
+  'Preparing',
+  'Submitted',
+  'Interview',
+  'Result',
+];
+
+export const getNextStatus = (currentStatus) => {
+  const index = SCHOLARSHIP_STATUS_ORDER.indexOf(currentStatus);
+  if (index === -1 || index === SCHOLARSHIP_STATUS_ORDER.length - 1) {
+    return null;
+  }
+  return SCHOLARSHIP_STATUS_ORDER[index + 1];
+};
+
 export const calculateScholarshipProgress = (scholarshipId, checklistItems) => {
   const items = checklistItems[scholarshipId] || [];
   const total = items.length;

@@ -118,6 +118,10 @@ const FilterPanel = ({
     [filters, onFilterChange]
   );
 
+  const handleActiveOnlyToggle = useCallback(() => {
+    onFilterChange({ ...filters, activeDeadlineOnly: !filters.activeDeadlineOnly });
+  }, [filters, onFilterChange]);
+
   const handleClearAll = useCallback(() => {
     onFilterChange({});
   }, [onFilterChange]);
@@ -125,7 +129,8 @@ const FilterPanel = ({
   const activeFilterCount =
     (filters.status?.length || 0) +
     (filters.country?.length || 0) +
-    (filters.deadlineRange?.type ? 1 : 0);
+    (filters.deadlineRange?.type ? 1 : 0) +
+    (filters.activeDeadlineOnly ? 1 : 0);
 
   const selectedStatusCount = filters.status?.length || 0;
   const selectedCountryCount = filters.country?.length || 0;
@@ -180,6 +185,22 @@ const FilterPanel = ({
       {/* Expanded Content */}
       {isExpanded && (
         <div className="p-4 space-y-4">
+          {/* Active Deadlines Only Toggle */}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={Boolean(filters.activeDeadlineOnly)}
+              onChange={handleActiveOnlyToggle}
+              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-600 dark:border-gray-500"
+            />
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Active deadlines only
+            </span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              (hide Submitted, Interview, Result)
+            </span>
+          </label>
+
           {/* Status Filter */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

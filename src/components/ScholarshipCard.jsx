@@ -1,4 +1,5 @@
 import React from 'react';
+import { getNextStatus } from '../utils/stats';
 
 const statusColors = {
   'Not Started': 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200',
@@ -24,6 +25,7 @@ const ScholarshipCard = ({
   onViewChecklist,
   checklistItems,
   documents = [],
+  onAdvanceStatus,
 }) => {
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -76,9 +78,24 @@ const ScholarshipCard = ({
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">{scholarship.name}</h3>
           <p className="text-sm text-gray-600 dark:text-gray-300">{scholarship.provider}</p>
         </div>
-        <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[scholarship.status]}`}>
-          {scholarship.status}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[scholarship.status]}`}>
+            {scholarship.status}
+          </span>
+          {onAdvanceStatus && getNextStatus(scholarship.status) && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onAdvanceStatus(scholarship.id, scholarship.status);
+              }}
+              className="px-2 py-1 rounded text-xs font-medium border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 dark:focus:ring-offset-gray-800"
+              title={`Advance to ${getNextStatus(scholarship.status)}`}
+              aria-label={`Advance ${scholarship.name} to ${getNextStatus(scholarship.status)}`}
+            >
+              → {getNextStatus(scholarship.status)}
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-2 mb-4">

@@ -1,4 +1,4 @@
-import { getUrgencyLevel } from './stats';
+import { getUrgencyLevel, hasActiveDeadline } from './stats';
 
 /**
  * Filter scholarships by multiple criteria
@@ -14,6 +14,11 @@ import { getUrgencyLevel } from './stats';
  */
 export const filterScholarships = (scholarships, filters = {}) => {
   let filtered = [...scholarships];
+
+  // Filter to active-deadline scholarships only
+  if (filters.activeDeadlineOnly) {
+    filtered = filtered.filter(hasActiveDeadline);
+  }
 
   // Filter by status (OR logic within status - show scholarships matching any selected status)
   if (filters.status && filters.status.length > 0) {
@@ -152,8 +157,9 @@ export const hasActiveFilters = (filters) => {
   const hasStatusFilter = filters.status && filters.status.length > 0;
   const hasCountryFilter = filters.country && filters.country.length > 0;
   const hasDeadlineFilter = filters.deadlineRange && filters.deadlineRange.type;
+  const hasActiveOnly = Boolean(filters.activeDeadlineOnly);
 
-  return hasStatusFilter || hasCountryFilter || hasDeadlineFilter;
+  return hasStatusFilter || hasCountryFilter || hasDeadlineFilter || hasActiveOnly;
 };
 
 /**
@@ -168,6 +174,7 @@ export const getActiveFilterCount = (filters) => {
   if (filters.status && filters.status.length > 0) count++;
   if (filters.country && filters.country.length > 0) count++;
   if (filters.deadlineRange && filters.deadlineRange.type) count++;
+  if (filters.activeDeadlineOnly) count++;
 
   return count;
 };

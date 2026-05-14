@@ -14,6 +14,7 @@ import BottomNav from './components/BottomNav';
 import ReminderTray from './components/ReminderTray';
 import { getAllScholarships, createScholarship, updateScholarship, deleteScholarship, getChecklistItems, createChecklistItem, createChecklistItemsBulk, updateChecklistItem, deleteChecklistItem, reorderChecklistItems, getAllDocuments } from './db/indexeddb';
 import { seedDatabase } from './utils/seedDatabase';
+import { getNextStatus } from './utils/stats';
 import {
   DEFAULT_REMINDER_PREFERENCES,
   evaluateReminders,
@@ -387,6 +388,17 @@ function App() {
     }
   }, []);
 
+  const handleAdvanceScholarshipStatus = useCallback(async (id, currentStatus) => {
+    const nextStatus = getNextStatus(currentStatus);
+    if (!nextStatus) return;
+    try {
+      await updateScholarship(id, { status: nextStatus });
+      await loadScholarships();
+    } catch (error) {
+      console.error('Error advancing scholarship status:', error);
+    }
+  }, []);
+
   const handleCreateIndependentTimelineTask = useCallback(async (data) => {
     try {
       await createChecklistItem(null, {
@@ -751,6 +763,7 @@ function App() {
               onViewChecklist={handleViewChecklist}
               checklistItemsByScholarship={checklistItemsByScholarship}
               documents={documents}
+              onAdvanceStatus={handleAdvanceScholarshipStatus}
             />
           ) : view === 'checklist' ? (
             <ChecklistView

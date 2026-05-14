@@ -55,22 +55,34 @@ const CalendarDay = ({ day, scholarships, onClick, isToday }) => {
       {hasScholarships && (
         <div className="space-y-1">
           {/* Show up to 2 scholarships, rest as count */}
-          {scholarships.slice(0, 2).map((scholarship, index) => (
-            <div
-              key={scholarship.id}
-              className="text-xs truncate px-1 py-0.5 rounded"
-              style={{
-                backgroundColor: `${urgencyColor}20`,
-                color: urgencyColor,
-                borderLeft: `2px solid ${urgencyColor}`,
-              }}
-              title={scholarship.name}
-            >
-              {scholarship.name.length > 12
-                ? scholarship.name.substring(0, 12) + '...'
-                : scholarship.name}
-            </div>
-          ))}
+          {scholarships.slice(0, 2).map((scholarship, index) => {
+            const isActive = hasActiveDeadline(scholarship);
+            const slipStyle = isActive
+              ? {
+                  backgroundColor: `${urgencyColor}20`,
+                  color: urgencyColor,
+                  borderLeft: `2px solid ${urgencyColor}`,
+                }
+              : {
+                  backgroundColor: 'rgba(156, 163, 175, 0.15)',
+                  color: '#6b7280',
+                  borderLeft: '2px solid #9ca3af',
+                  textDecoration: 'line-through',
+                  opacity: 0.7,
+                };
+            return (
+              <div
+                key={scholarship.id}
+                className="text-xs truncate px-1 py-0.5 rounded"
+                style={slipStyle}
+                title={`${scholarship.name}${isActive ? '' : ` (${scholarship.status})`}`}
+              >
+                {scholarship.name.length > 12
+                  ? scholarship.name.substring(0, 12) + '...'
+                  : scholarship.name}
+              </div>
+            );
+          })}
           {scholarships.length > 2 && (
             <div
               className="text-xs font-medium text-center rounded"
@@ -86,17 +98,26 @@ const CalendarDay = ({ day, scholarships, onClick, isToday }) => {
       )}
 
       {/* Scholarship count indicator */}
-      {hasScholarships && scholarships.length > 0 && (
-        <div
-          className="absolute bottom-1 right-1 w-5 h-5 flex items-center justify-center rounded-full text-xs font-medium"
-          style={{
-            backgroundColor: urgencyColor,
-            color: 'white',
-          }}
-        >
-          {scholarships.length}
-        </div>
-      )}
+      {hasScholarships && scholarships.length > 0 && (() => {
+        const activeCount = scholarships.filter(hasActiveDeadline).length;
+        const badgeColor = activeCount === 0 ? '#9ca3af' : urgencyColor;
+        return (
+          <div
+            className="absolute bottom-1 right-1 w-5 h-5 flex items-center justify-center rounded-full text-xs font-medium"
+            style={{
+              backgroundColor: badgeColor,
+              color: 'white',
+            }}
+            title={
+              activeCount === scholarships.length
+                ? `${scholarships.length} scholarship${scholarships.length === 1 ? '' : 's'}`
+                : `${activeCount} active of ${scholarships.length} total`
+            }
+          >
+            {scholarships.length}
+          </div>
+        );
+      })()}
     </div>
   );
 };

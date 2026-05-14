@@ -50,6 +50,7 @@ const ScholarshipList = ({
   onViewChecklist,
   checklistItemsByScholarship,
   documents = [],
+  onAdvanceStatus,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filters, setFilters] = useState({});
@@ -301,6 +302,7 @@ const ScholarshipList = ({
               onViewChecklist={onViewChecklist}
               checklistItems={checklistItemsByScholarship?.[scholarship.id] || []}
               documents={documents}
+              onAdvanceStatus={onAdvanceStatus}
             />
           ))}
         </div>

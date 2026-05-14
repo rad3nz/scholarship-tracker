@@ -1,13 +1,15 @@
 import React from "react";
 import { getScholarshipsByUrgency } from "../utils/filterScholarships";
 import { getCalendarUrgencyColor } from "../utils/calendarUtils";
+import { hasActiveDeadline } from "../utils/stats";
 
 /**
  * CalendarLegend component - Shows color coding explanation for urgency levels
  * @param {Array} scholarships - All scholarships to count by urgency
  */
 const CalendarLegend = ({ scholarships }) => {
-  const byUrgency = getScholarshipsByUrgency(scholarships);
+  const activeScholarships = scholarships.filter(hasActiveDeadline);
+  const byUrgency = getScholarshipsByUrgency(activeScholarships);
 
   const urgencyItems = [
     {
