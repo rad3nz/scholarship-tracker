@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { getUrgencyLevel } from '../utils/stats';
+import { getUrgencyLevel, hasActiveDeadline } from '../utils/stats';
 import { getDaysUntilDeadline, getCalendarUrgencyColor } from '../utils/calendarUtils';
 
 /**
@@ -15,8 +15,11 @@ const CalendarDay = ({ day, scholarships, onClick, isToday }) => {
   // Get urgency color for scholarships
   const urgencyColor = useMemo(() => {
     if (!hasScholarships) return null;
-    // Use the most urgent scholarship's color
-    const urgencies = scholarships.map((s) => {
+    const activeScholarships = scholarships.filter(hasActiveDeadline);
+    if (activeScholarships.length === 0) {
+      return getCalendarUrgencyColor('low');
+    }
+    const urgencies = activeScholarships.map((s) => {
       const days = getDaysUntilDeadline(s.deadline);
       return getUrgencyLevel(days);
     });

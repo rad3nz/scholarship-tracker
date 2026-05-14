@@ -9,6 +9,7 @@ import {
   isToday,
 } from '../utils/calendarUtils';
 import { groupScholarshipsByDate } from '../utils/filterScholarships';
+import { hasActiveDeadline } from '../utils/stats';
 import CalendarDay from './CalendarDay';
 import CalendarDetail from './CalendarDetail';
 import CalendarLegend from './CalendarLegend';
@@ -186,6 +187,7 @@ const CalendarView = ({ scholarships, onViewChecklist, onEdit }) => {
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
           <div className="text-2xl font-bold text-red-600 dark:text-red-400">
             {scholarships.filter((s) => {
+              if (!hasActiveDeadline(s)) return false;
               const deadline = new Date(s.deadline);
               deadline.setHours(0, 0, 0, 0);
               return deadline < new Date(today.year, today.month, today.day);
@@ -198,6 +200,7 @@ const CalendarView = ({ scholarships, onViewChecklist, onEdit }) => {
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
           <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
             {scholarships.filter((s) => {
+              if (!hasActiveDeadline(s)) return false;
               const days = Math.ceil(
                 (new Date(s.deadline) - new Date(today.year, today.month, today.day)) /
                   (1000 * 60 * 60 * 24)
@@ -212,6 +215,7 @@ const CalendarView = ({ scholarships, onViewChecklist, onEdit }) => {
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
             {scholarships.filter((s) => {
+              if (!hasActiveDeadline(s)) return false;
               const deadline = new Date(s.deadline);
               deadline.setHours(0, 0, 0, 0);
               return deadline >= new Date(today.year, today.month, today.day);

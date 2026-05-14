@@ -1,3 +1,8 @@
+export const INACTIVE_DEADLINE_STATUSES = ['Submitted', 'Interview', 'Result'];
+
+export const hasActiveDeadline = (scholarship) =>
+  !INACTIVE_DEADLINE_STATUSES.includes(scholarship?.status);
+
 export const calculateScholarshipProgress = (scholarshipId, checklistItems) => {
   const items = checklistItems[scholarshipId] || [];
   const total = items.length;
@@ -16,6 +21,7 @@ export const getUpcomingDeadlines = (scholarships) => {
   today.setHours(0, 0, 0, 0);
   
   return scholarships
+    .filter(hasActiveDeadline)
     .map(scholarship => {
       const deadline = new Date(scholarship.deadline);
       deadline.setHours(0, 0, 0, 0);
@@ -67,6 +73,7 @@ export const getOverallStats = (scholarships, checklistData, documents = []) => 
   today.setHours(0, 0, 0, 0);
   
   const overdueCount = scholarships.filter(scholarship => {
+    if (!hasActiveDeadline(scholarship)) return false;
     const deadline = new Date(scholarship.deadline);
     deadline.setHours(0, 0, 0, 0);
     return deadline < today;
